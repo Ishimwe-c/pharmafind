@@ -1,0 +1,33 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <!-- Background circle -->
+  <circle cx="256" cy="256" r="240" fill="#8B5CF6" stroke="#6D28D9" stroke-width="8"/>
+  
+  <!-- Pharmacy cross -->
+  <rect x="200" y="120" width="112" height="40" rx="20" fill="white"/>
+  <rect x="200" y="200" width="112" height="40" rx="20" fill="white"/>
+  <rect x="200" y="280" width="112" height="40" rx="20" fill="white"/>
+  <rect x="200" y="360" width="112" height="40" rx="20" fill="white"/>
+  
+  <!-- Vertical line -->
+  <rect x="246" y="120" width="20" height="280" rx="10" fill="white"/>
+  
+  <!-- Pill bottle -->
+  <rect x="320" y="180" width="60" height="120" rx="8" fill="white" opacity="0.9"/>
+  <rect x="325" y="185" width="50" height="110" rx="4" fill="#8B5CF6" opacity="0.3"/>
+  
+  <!-- Pills -->
+  <circle cx="340" cy="220" r="8" fill="white"/>
+  <circle cx="365" cy="240" r="8" fill="white"/>
+  <circle cx="340" cy="260" r="8" fill="white"/>
+  <circle cx="365" cy="280" r="8" fill="white"/>
+  
+  <!-- Location pin -->
+  <path d="M150 200 C150 180, 170 160, 200 160 C230 160, 250 180, 250 200 C250 220, 200 280, 200 280 C200 280, 150 220, 150 200 Z" fill="white"/>
+  <circle cx="200" cy="200" r="8" fill="#8B5CF6"/>
+</svg>
+
+
+
+
+
+

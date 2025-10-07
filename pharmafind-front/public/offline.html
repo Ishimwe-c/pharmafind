@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Offline - PharmaFind</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            margin: 0;
+            padding: 0;
+            background: linear-gradient(135deg, #8B5CF6 0%, #7C3AED 100%);
+            color: white;
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .container {
+            text-align: center;
+            max-width: 400px;
+            padding: 40px 20px;
+        }
+        .icon {
+            font-size: 80px;
+            margin-bottom: 20px;
+        }
+        h1 {
+            font-size: 28px;
+            margin-bottom: 16px;
+            font-weight: 600;
+        }
+        p {
+            font-size: 16px;
+            line-height: 1.5;
+            margin-bottom: 30px;
+            opacity: 0.9;
+        }
+        .retry-btn {
+            background: white;
+            color: #8B5CF6;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: transform 0.2s;
+        }
+        .retry-btn:hover {
+            transform: translateY(-2px);
+        }
+        .features {
+            margin-top: 40px;
+            text-align: left;
+        }
+        .feature {
+            display: flex;
+            align-items: center;
+            margin-bottom: 12px;
+            font-size: 14px;
+        }
+        .feature-icon {
+            margin-right: 12px;
+            font-size: 20px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="icon">📱</div>
+        <h1>You're Offline</h1>
+        <p>It looks like you're not connected to the internet. PharmaFind needs an internet connection to find pharmacies near you.</p>
+        
+        <button class="retry-btn" onclick="window.location.reload()">
+            Try Again
+        </button>
+        
+        <div class="features">
+            <div class="feature">
+                <span class="feature-icon">🔍</span>
+                <span>Search pharmacies by insurance</span>
+            </div>
+            <div class="feature">
+                <span class="feature-icon">📍</span>
+                <span>Find locations on interactive map</span>
+            </div>
+            <div class="feature">
+                <span class="feature-icon">⏰</span>
+                <span>Check real-time pharmacy hours</span>
+            </div>
+            <div class="feature">
+                <span class="feature-icon">🚗</span>
+                <span>Get driving directions</span>
+            </div>
+        </div>
+    </div>
+</body>
+</html>
+
+
+
+
+
+
