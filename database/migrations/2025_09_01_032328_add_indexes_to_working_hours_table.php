@@ -12,14 +12,29 @@ return new class extends Migration
     public function up(): void
     {
         Schema::table('working_hours', function (Blueprint $table) {
+            // Check if indexes don't already exist before adding them
+            if (!$this->indexExists('working_hours', 'working_hours_day_of_week_pharmacy_id_index')) {
+                $table->index(['day_of_week', 'pharmacy_id']);
+            }
             
-            
-            // Composite index for day_of_week + pharmacy_id (for finding specific day schedules)
-            $table->index(['day_of_week', 'pharmacy_id']);
-            
-            // Index for closed status (for filtering open/closed pharmacies)
-            $table->index('closed');
+            if (!$this->indexExists('working_hours', 'working_hours_closed_index')) {
+                $table->index('closed');
+            }
         });
+    }
+
+    /**
+     * Check if an index exists on a table
+     */
+    private function indexExists($table, $index)
+    {
+        $indexes = \DB::select("SHOW INDEX FROM {$table}");
+        foreach ($indexes as $idx) {
+            if ($idx->Key_name === $index) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /**

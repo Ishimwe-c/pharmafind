@@ -11,6 +11,10 @@ use App\Http\Controllers\PharmacyManagementController;
 use App\Http\Controllers\InsuranceManagementController;
 use App\Http\Controllers\ContactController;
 use App\Http\Controllers\AdminContactController;
+use App\Http\Controllers\Api\MedicineController;
+use App\Http\Controllers\Api\PatientInsuranceController;
+use App\Http\Controllers\Api\PurchaseController;
+use App\Http\Controllers\Api\NotificationController;
 
 // Public routes
 Route::get('/insurances', [InsuranceController::class, 'index']);
@@ -41,6 +45,77 @@ Route::middleware('auth:sanctum')->group(function () {
     
     // Public pharmacy route (moved here to avoid conflicts)
     Route::get('/pharmacy/{id}', [PharmacyController::class, 'show']);
+    
+    // Medicine management routes
+    Route::prefix('medicines')->group(function () {
+        Route::get('/', [MedicineController::class, 'index']);
+        Route::post('/', [MedicineController::class, 'store']);
+        Route::get('/categories', [MedicineController::class, 'categories']);
+        Route::get('/{id}', [MedicineController::class, 'show']);
+        Route::put('/{id}', [MedicineController::class, 'update']);
+        Route::delete('/{id}', [MedicineController::class, 'destroy']);
+        Route::post('/{id}/stock', [MedicineController::class, 'updateStock']);
+    });
+    
+    // Patient insurance management routes
+    Route::prefix('patient-insurances')->group(function () {
+        Route::get('/', [PatientInsuranceController::class, 'index']);
+        Route::post('/', [PatientInsuranceController::class, 'store']);
+        Route::get('/available', [PatientInsuranceController::class, 'available']);
+        Route::get('/{id}', [PatientInsuranceController::class, 'show']);
+        Route::put('/{id}', [PatientInsuranceController::class, 'update']);
+        Route::delete('/{id}', [PatientInsuranceController::class, 'destroy']);
+        Route::post('/check-coverage/{pharmacyId}', [PatientInsuranceController::class, 'checkCoverage']);
+    });
+    
+    // Purchase management routes
+    Route::prefix('purchases')->group(function () {
+        Route::get('/', [PurchaseController::class, 'index']);
+        Route::post('/', [PurchaseController::class, 'store']);
+        Route::get('/{id}', [PurchaseController::class, 'show']);
+        Route::put('/{id}', [PurchaseController::class, 'update']);
+        Route::delete('/{id}', [PurchaseController::class, 'destroy']);
+        Route::get('/reports/pharmacy', [PurchaseController::class, 'pharmacyReports']);
+        Route::get('/reports/insurance', [PurchaseController::class, 'insuranceReports']);
+    });
+    
+    // Notification routes
+    Route::prefix('notifications')->group(function () {
+        Route::get('/', [NotificationController::class, 'index']);
+        Route::post('/mark-read/{id}', [NotificationController::class, 'markAsRead']);
+        Route::post('/mark-all-read', [NotificationController::class, 'markAllAsRead']);
+        Route::delete('/{id}', [NotificationController::class, 'destroy']);
+    });
+    
+    // Insurance match alert route
+    Route::post('/check-insurance-match', function (Request $request) {
+        $validator = \Illuminate\Support\Facades\Validator::make($request->all(), [
+            'latitude' => 'required|numeric',
+            'longitude' => 'required|numeric',
+            'radius_km' => 'nullable|numeric|min:0.1|max:50'
+        ]);
+        
+        if ($validator->fails()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Validation errors',
+                'errors' => $validator->errors()
+            ], 422);
+        }
+        
+        $user = $request->user();
+        $latitude = $request->latitude;
+        $longitude = $request->longitude;
+        $radiusKm = $request->get('radius_km', 5);
+        
+        $insuranceMatchService = new \App\Services\InsuranceMatchService();
+        $insuranceMatchService->checkInsuranceMatches($user, $latitude, $longitude, $radiusKm);
+        
+        return response()->json([
+            'success' => true,
+            'message' => 'Insurance match check completed. Check your notifications for any matches.'
+        ]);
+    });
     
     // Admin dashboard routes
     Route::middleware(['auth:sanctum', \App\Http\Middleware\AdminMiddleware::class])->group(function () {

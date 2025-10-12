@@ -60,6 +60,20 @@ class User extends Authenticatable
         return $this->hasMany(Pharmacy::class);
     }
 
+    // A user (patient) can have many insurances
+    public function insurances()
+    {
+        return $this->belongsToMany(Insurance::class, 'insurance_patient')
+                    ->withPivot(['policy_number', 'member_id', 'coverage_start_date', 'coverage_end_date', 'is_active', 'notes'])
+                    ->withTimestamps();
+    }
+
+    // A user (patient) can have many purchases
+    public function purchases()
+    {
+        return $this->hasMany(Purchase::class);
+    }
+
     /**
      * Check if user is suspended (soft deleted)
      */

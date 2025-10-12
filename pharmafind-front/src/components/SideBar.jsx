@@ -42,6 +42,12 @@ const SideBar = () => {
       description: "Overview of your pharmacy"
     },
     { 
+      icon: "medication", 
+      label: "Medicines", 
+      path: "/pharmacy/medicines",
+      description: "Manage medicine inventory"
+    },
+    { 
       icon: "edit", 
       label: "Edit Details", 
       path: "/pharmacy/edit-details",

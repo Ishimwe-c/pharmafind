@@ -1,5 +1,5 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
-import locationService from '../services/locationService';
+import { locationService } from '../services/locationService';
 
 /**
  * Custom hook for managing directions functionality
@@ -82,7 +82,9 @@ export const useDirections = () => {
    * Stop watching location
    */
   const stopLocationWatching = useCallback(() => {
-    locationService.stopWatching();
+    if (watchIdRef.current) {
+      locationService.stopWatchingLocation(watchIdRef.current);
+    }
     watchIdRef.current = null;
     
     if (retryTimeoutRef.current) {

@@ -16,4 +16,18 @@ class Insurance extends Model
     {
         return $this->belongsToMany(Pharmacy::class, 'insurance_pharmacy');
     }
+
+    // An insurance can be used by many patients
+    public function patients()
+    {
+        return $this->belongsToMany(User::class, 'insurance_patient')
+                    ->withPivot(['policy_number', 'member_id', 'coverage_start_date', 'coverage_end_date', 'is_active', 'notes'])
+                    ->withTimestamps();
+    }
+
+    // An insurance can be used in many purchases
+    public function purchases()
+    {
+        return $this->hasMany(Purchase::class);
+    }
 }

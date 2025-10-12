@@ -33,6 +33,8 @@ const PatientDashboard = lazy(() => import("./views/patient/PatientDashboard.jsx
 const SearchResult = lazy(() => import("./views/patient/SearchResult.jsx"));
 const PatientProfile = lazy(() => import("./views/patient/PatientProfile.jsx"));
 const SearchHistoryPage = lazy(() => import("./views/patient/SearchHistoryPage.jsx"));
+const InsuranceManagement = lazy(() => import("./views/patient/InsuranceManagement.jsx"));
+const Notifications = lazy(() => import("./views/patient/Notifications.jsx"));
 
 // Pharmacy views - Lazy load for better performance
 const PharmacyDashboard = lazy(() => import("./views/pharmacy/PharmacyDashboard.jsx"));
@@ -40,12 +42,13 @@ const PharmacyEditDetails = lazy(() => import("./views/pharmacy/PharmacyEditDeta
 const PharmacyLocationSettings = lazy(() => import("./views/pharmacy/PharmacyLocationSettings.jsx"));
 const PharmacyWorkingHours = lazy(() => import("./views/pharmacy/PharmacyWorkingHours.jsx"));
 const PharmacyAcceptedInsurances = lazy(() => import("./views/pharmacy/PharmacyAcceptedInsurances.jsx"));
+const MedicineManagement = lazy(() => import("./views/pharmacy/MedicineManagement.jsx"));
 
 // Admin views - Lazy load for better performance
 const AdminDashboard = lazy(() => import("./views/admin/AdminDashboard.jsx"));
 const PharmacyManagement = lazy(() => import("./views/admin/PharmacyManagement.jsx"));
 const UserManagement = lazy(() => import("./views/admin/UserManagement.jsx"));
-const InsuranceManagement = lazy(() => import("./views/admin/InsuranceManagement.jsx"));
+const AdminInsuranceManagement = lazy(() => import("./views/admin/InsuranceManagement.jsx"));
 const ContactMessages = lazy(() => import("./views/admin/ContactMessages.jsx"));
 
 // Error - Lazy load
@@ -185,6 +188,22 @@ const router = createBrowserRouter([
           </Suspense>
         )
       },
+      { 
+        path: "insurance", 
+        element: (
+          <Suspense fallback={<LoadingSpinner size="lg" text="Loading insurance management..." />}>
+            <InsuranceManagement />
+          </Suspense>
+        )
+      },
+      { 
+        path: "notifications", 
+        element: (
+          <Suspense fallback={<LoadingSpinner size="lg" text="Loading notifications..." />}>
+            <Notifications />
+          </Suspense>
+        )
+      },
     ],
   },
 
@@ -234,6 +253,14 @@ const router = createBrowserRouter([
           </Suspense>
         )
       },
+      { 
+        path: "medicines", 
+        element: (
+          <Suspense fallback={<LoadingSpinner size="lg" text="Loading medicine management..." />}>
+            <MedicineManagement />
+          </Suspense>
+        )
+      },
     ],
   },
 
@@ -271,7 +298,7 @@ const router = createBrowserRouter([
         path: "insurances", 
         element: (
           <Suspense fallback={<LoadingSpinner size="lg" text="Loading insurance management..." />}>
-            <InsuranceManagement />
+            <AdminInsuranceManagement />
           </Suspense>
         )
       },

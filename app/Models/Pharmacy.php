@@ -51,6 +51,18 @@ class Pharmacy extends Model
         return $this->belongsTo(User::class, 'verified_by');
     }
 
+    // A pharmacy has many medicines
+    public function medicines()
+    {
+        return $this->hasMany(Medicine::class);
+    }
+
+    // A pharmacy has many purchases
+    public function purchases()
+    {
+        return $this->hasMany(Purchase::class);
+    }
+
     // Scope for active pharmacies (visible to users)
     public function scopeActive($query)
     {

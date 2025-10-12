@@ -1,243 +1,149 @@
+import axiosClient from '../axios-client';
+
 /**
- * Enhanced Location Service
- * Provides accurate location detection with multiple fallback methods
+ * Location Service
+ * 
+ * Handles all API calls related to location-based features
+ * Used for insurance match alerts and location-based pharmacy discovery
  */
 
-class LocationService {
-  constructor() {
-    this.watchId = null;
-    this.isWatching = false;
-    this.lastKnownLocation = null;
-    this.locationCallbacks = new Set();
-  }
+export const locationService = {
+  // Check for insurance matches when user is near pharmacies
+  checkInsuranceMatch: async (locationData) => {
+    const response = await axiosClient.post('/check-insurance-match', locationData);
+    return response.data;
+  },
 
-  /**
-   * Get user's current location with high accuracy
-   * @param {Object} options - Location options
-   * @returns {Promise<Object>} Location object with lat, lng, accuracy
-   */
-  async getCurrentLocation(options = {}) {
-    const defaultOptions = {
-      enableHighAccuracy: true,
-      timeout: 15000,
-      maximumAge: 0, // Force fresh location
-      ...options
+  // Get pharmacies that accept user's insurance within a radius
+  getPharmaciesForInsurance: async (userLocation, radiusKm = 5) => {
+    const params = {
+      latitude: userLocation.latitude,
+      longitude: userLocation.longitude,
+      radius_km: radiusKm
     };
+    
+    const response = await axiosClient.post('/check-insurance-match', params);
+    return response.data;
+  },
 
+  // Get nearby pharmacies (existing function from the original service)
+  getNearbyPharmacies: async (userLocation, radiusKm = 10) => {
+    const params = new URLSearchParams();
+    params.append('latitude', userLocation.latitude);
+    params.append('longitude', userLocation.longitude);
+    params.append('radius', radiusKm);
+
+    const response = await axiosClient.get(`/pharmacies/nearby?${params.toString()}`);
+    return response.data;
+  },
+
+  // Calculate distance between two points using Haversine formula
+  calculateDistance: (lat1, lon1, lat2, lon2) => {
+    const R = 6371; // Earth's radius in kilometers
+    const dLat = (lat2 - lat1) * Math.PI / 180;
+    const dLon = (lon2 - lon1) * Math.PI / 180;
+    const a = 
+      Math.sin(dLat/2) * Math.sin(dLat/2) +
+      Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * 
+      Math.sin(dLon/2) * Math.sin(dLon/2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+    const distance = R * c;
+    return distance;
+  },
+
+  // Format distance for display
+  formatDistance: (distance) => {
+    if (distance < 1) {
+      return `${Math.round(distance * 1000)}m`;
+    } else {
+      return `${distance.toFixed(1)}km`;
+    }
+  },
+
+  // Get user's current location
+  getCurrentLocation: () => {
     return new Promise((resolve, reject) => {
       if (!navigator.geolocation) {
         reject(new Error('Geolocation is not supported by this browser'));
         return;
       }
 
-      // First attempt: High accuracy with short timeout
       navigator.geolocation.getCurrentPosition(
         (position) => {
-          const location = {
-            lat: position.coords.latitude,
-            lng: position.coords.longitude,
-            accuracy: position.coords.accuracy,
-            timestamp: position.timestamp
-          };
-          
-          this.lastKnownLocation = location;
-          resolve(location);
+          resolve({
+            latitude: position.coords.latitude,
+            longitude: position.coords.longitude,
+            accuracy: position.coords.accuracy
+          });
         },
         (error) => {
-          console.warn('High accuracy location failed, trying fallback:', error.message);
-          
-          // Fallback: Lower accuracy with longer timeout
-          navigator.geolocation.getCurrentPosition(
-            (position) => {
-              const location = {
-                lat: position.coords.latitude,
-                lng: position.coords.longitude,
-                accuracy: position.coords.accuracy,
-                timestamp: position.timestamp
-              };
-              
-              this.lastKnownLocation = location;
-              resolve(location);
-            },
-            (fallbackError) => {
-              console.error('All location attempts failed:', fallbackError.message);
-              reject(new Error(this.getErrorMessage(fallbackError)));
-            },
-            {
-              enableHighAccuracy: false,
-              timeout: 30000,
-              maximumAge: 300000 // 5 minutes
-            }
-          );
+          reject(error);
         },
-        defaultOptions
+        {
+          enableHighAccuracy: true,
+          timeout: 10000,
+          maximumAge: 300000 // 5 minutes
+        }
+      );
+    });
+  },
+
+  // Watch user's location for insurance match alerts
+  watchLocation: (callback, options = {}) => {
+    const defaultOptions = {
+      enableHighAccuracy: true,
+      timeout: 10000,
+      maximumAge: 60000 // 1 minute
+    };
+
+    const watchOptions = { ...defaultOptions, ...options };
+
+    if (!navigator.geolocation) {
+      throw new Error('Geolocation is not supported by this browser');
+    }
+
+    return navigator.geolocation.watchPosition(
+      (position) => {
+        const location = {
+          latitude: position.coords.latitude,
+          longitude: position.coords.longitude,
+          accuracy: position.coords.accuracy
+        };
+        callback(location);
+      },
+      (error) => {
+        console.error('Location watch error:', error);
+      },
+      watchOptions
+    );
+  },
+
+  // Stop watching location
+  stopWatchingLocation: (watchId) => {
+    navigator.geolocation.clearWatch(watchId);
+  },
+
+  // Check if location is within radius of a pharmacy
+  isWithinRadius: (userLocation, pharmacyLocation, radiusKm) => {
+    const distance = locationService.calculateDistance(
+      userLocation.latitude,
+      userLocation.longitude,
+      pharmacyLocation.latitude,
+      pharmacyLocation.longitude
+    );
+    return distance <= radiusKm;
+  },
+
+  // Get pharmacies within radius of user location
+  getPharmaciesWithinRadius: (userLocation, pharmacies, radiusKm) => {
+    return pharmacies.filter(pharmacy => {
+      if (!pharmacy.latitude || !pharmacy.longitude) return false;
+      
+      return locationService.isWithinRadius(
+        userLocation,
+        { latitude: pharmacy.latitude, longitude: pharmacy.longitude },
+        radiusKm
       );
     });
   }
-
-  /**
-   * Start watching location with high accuracy
-   * @param {Function} onLocationUpdate - Callback for location updates
-   * @param {Function} onError - Callback for errors
-   * @param {Object} options - Watch options
-   */
-  startWatching(onLocationUpdate, onError, options = {}) {
-    if (this.isWatching) {
-      this.stopWatching();
-    }
-
-    const defaultOptions = {
-      enableHighAccuracy: true,
-      timeout: 20000,
-      maximumAge: 10000, // 10 seconds
-      ...options
-    };
-
-    this.watchId = navigator.geolocation.watchPosition(
-      (position) => {
-        const location = {
-          lat: position.coords.latitude,
-          lng: position.coords.longitude,
-          accuracy: position.coords.accuracy,
-          timestamp: position.timestamp
-        };
-        
-        this.lastKnownLocation = location;
-        onLocationUpdate(location);
-      },
-      (error) => {
-        console.error('Location watch error:', error.message);
-        onError(error);
-      },
-      defaultOptions
-    );
-
-    this.isWatching = true;
-  }
-
-  /**
-   * Stop watching location
-   */
-  stopWatching() {
-    if (this.watchId !== null) {
-      navigator.geolocation.clearWatch(this.watchId);
-      this.watchId = null;
-      this.isWatching = false;
-    }
-  }
-
-  /**
-   * Get last known location
-   * @returns {Object|null} Last known location or null
-   */
-  getLastKnownLocation() {
-    return this.lastKnownLocation;
-  }
-
-  /**
-   * Check if location is accurate enough
-   * @param {Object} location - Location object
-   * @param {number} maxAccuracy - Maximum acceptable accuracy in meters
-   * @returns {boolean} True if location is accurate enough
-   */
-  isLocationAccurate(location, maxAccuracy = 50) {
-    return location && location.accuracy <= maxAccuracy;
-  }
-
-  /**
-   * Get user-friendly error message
-   * @param {Object} error - Geolocation error
-   * @returns {string} Error message
-   */
-  getErrorMessage(error) {
-    switch (error.code) {
-      case error.PERMISSION_DENIED:
-        return 'Location access denied. Please enable location permissions and try again.';
-      case error.POSITION_UNAVAILABLE:
-        return 'Location information is unavailable. Please check your device settings.';
-      case error.TIMEOUT:
-        return 'Location request timed out. Please try again.';
-      default:
-        return 'An unknown error occurred while getting your location.';
-    }
-  }
-
-  /**
-   * Request location permission
-   * @returns {Promise<boolean>} True if permission granted
-   */
-  async requestPermission() {
-    if (!navigator.permissions) {
-      // Fallback for browsers that don't support permissions API
-      try {
-        await this.getCurrentLocation({ timeout: 1000 });
-        return true;
-      } catch {
-        return false;
-      }
-    }
-
-    try {
-      const permission = await navigator.permissions.query({ name: 'geolocation' });
-      return permission.state === 'granted';
-    } catch {
-      return false;
-    }
-  }
-
-  /**
-   * Get location with automatic retry
-   * @param {number} maxRetries - Maximum number of retries
-   * @param {number} retryDelay - Delay between retries in ms
-   * @returns {Promise<Object>} Location object
-   */
-  async getLocationWithRetry(maxRetries = 3, retryDelay = 2000) {
-    let lastError;
-    
-    for (let i = 0; i < maxRetries; i++) {
-      try {
-        const location = await this.getCurrentLocation();
-        
-        // If location is accurate enough, return it
-        if (this.isLocationAccurate(location)) {
-          return location;
-        }
-        
-        // If this is the last attempt, return the location anyway
-        if (i === maxRetries - 1) {
-          return location;
-        }
-        
-        // Wait before retrying
-        await new Promise(resolve => setTimeout(resolve, retryDelay));
-      } catch (error) {
-        lastError = error;
-        
-        // If this is the last attempt, throw the error
-        if (i === maxRetries - 1) {
-          throw lastError;
-        }
-        
-        // Wait before retrying
-        await new Promise(resolve => setTimeout(resolve, retryDelay));
-      }
-    }
-    
-    throw lastError;
-  }
-}
-
-// Create singleton instance
-const locationService = new LocationService();
-
-export default locationService;
-
-
-
-
-
-
-
-
-
-
+};

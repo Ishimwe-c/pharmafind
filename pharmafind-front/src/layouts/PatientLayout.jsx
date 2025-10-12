@@ -34,6 +34,18 @@ export default function PatientLayout() {
       description: "Find pharmacies near you"
     },
     { 
+      icon: "local_hospital", 
+      label: "Insurance", 
+      path: "/patient/insurance",
+      description: "Manage your insurance"
+    },
+    { 
+      icon: "notifications", 
+      label: "Notifications", 
+      path: "/patient/notifications",
+      description: "View your notifications"
+    },
+    { 
       icon: "history", 
       label: "Search History", 
       path: "/patient/search-history",

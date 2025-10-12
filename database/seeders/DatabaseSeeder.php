@@ -13,10 +13,11 @@ class DatabaseSeeder extends Seeder
      */
     public function run(): void
     {
-        // Run insurance seeder first
+        // Run seeders in order
         $this->call([
             InsuranceSeeder::class,
             AdminSeeder::class,
+            MedicineSeeder::class,
         ]);
 
         // Create test users for development
