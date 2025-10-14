@@ -65,7 +65,7 @@ return [
     |
     */
 
-    'timezone' => 'UTC',
+    'timezone' => 'Africa/Kigali',  // Rwanda timezone (UTC+2)
 
     /*
     |--------------------------------------------------------------------------

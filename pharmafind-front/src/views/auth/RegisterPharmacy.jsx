@@ -3,8 +3,9 @@ import { useNavigate } from "react-router-dom";
 import Select from "react-select";
 import { AuthContext } from "../../context/AuthContext";
 import { useToast } from "../../context/ToastContext";
-import { GoogleMap, Marker, Autocomplete } from "@react-google-maps/api";
+import { GoogleMap, Marker, Autocomplete, Circle } from "@react-google-maps/api";
 import { useGoogleMaps } from "../../context/GoogleMapsContext";
+import geolocationService from "../../services/geolocationService";
 
 const RegisterPharmacy = () => {
   const { register } = useContext(AuthContext);
@@ -50,6 +51,10 @@ const RegisterPharmacy = () => {
   const [selectedLocation, setSelectedLocation] = useState(null);
   const [map, setMap] = useState(null);
   const [searchValue, setSearchValue] = useState("");
+  const [gettingLocation, setGettingLocation] = useState(false);
+  const [locationAccuracy, setLocationAccuracy] = useState(null);
+  const [accuracyCircle, setAccuracyCircle] = useState(null);
+  const [locationProgress, setLocationProgress] = useState(null);
   const autocompleteRef = useRef(null);
   const mapContainerStyle = { height: "300px", width: "100%" };
   const mapCenter = selectedLocation || { lat: 40.7128, lng: -74.0060 };
@@ -133,6 +138,91 @@ const RegisterPharmacy = () => {
     autocompleteRef.current = autocomplete;
   };
 
+  /**
+   * Get accuracy quality description
+   */
+  const getAccuracyQuality = (accuracy) => {
+    if (accuracy <= 10) return { label: 'Excellent', color: 'green', emoji: '🎯' };
+    if (accuracy <= 30) return { label: 'Very Good', color: 'blue', emoji: '✨' };
+    if (accuracy <= 50) return { label: 'Good', color: 'yellow', emoji: '👍' };
+    if (accuracy <= 100) return { label: 'Fair', color: 'orange', emoji: '⚠️' };
+    return { label: 'Low', color: 'red', emoji: '⚠️' };
+  };
+
+  /**
+   * Get user's current location with high precision
+   */
+  const handleUseCurrentLocation = async () => {
+    if (!geolocationService.isSupported()) {
+      addToast('Geolocation is not supported by your browser', 'error');
+      return;
+    }
+
+    try {
+      setGettingLocation(true);
+      setLocationProgress('Acquiring GPS signal...');
+      
+      // Use high-precision mode with multiple samples
+      const position = await geolocationService.getHighPrecisionPosition(
+        (current, total) => {
+          setLocationProgress(`Reading GPS ${current}/${total}...`);
+        }
+      );
+      
+      const location = {
+        lat: position.latitude,
+        lng: position.longitude
+      };
+      
+      setSelectedLocation(location);
+      setLocationAccuracy(position.accuracy);
+      
+      setFormData((prev) => ({
+        ...prev,
+        latitude: position.latitude.toFixed(6),
+        longitude: position.longitude.toFixed(6),
+        location: `${position.latitude.toFixed(6)}, ${position.longitude.toFixed(6)}`
+      }));
+      
+      // Pan to current location
+      if (map) {
+        map.panTo(location);
+        map.setZoom(18); // Closer zoom for current location
+      }
+      
+      // Show accuracy-based message
+      const quality = getAccuracyQuality(position.accuracy);
+      addToast(
+        `${quality.emoji} Location acquired with ${quality.label.toLowerCase()} accuracy (±${Math.round(position.accuracy)}m)`,
+        position.accuracy <= 30 ? 'success' : 'info'
+      );
+      
+      // Try to get address from coordinates using reverse geocoding
+      if (window.google && window.google.maps) {
+        const geocoder = new window.google.maps.Geocoder();
+        geocoder.geocode({ location: location }, (results, status) => {
+          if (status === 'OK' && results[0]) {
+            setFormData((prev) => ({
+              ...prev,
+              location: results[0].formatted_address
+            }));
+            setSearchValue(results[0].formatted_address);
+          }
+        });
+      }
+    } catch (error) {
+      console.error('Error getting location:', error);
+      if (error.code === 1) {
+        addToast('Location permission denied. Please enable location access in your browser settings.', 'error');
+      } else {
+        addToast('Could not get your current location. Please try again or use the search box.', 'error');
+      }
+    } finally {
+      setGettingLocation(false);
+      setLocationProgress(null);
+    }
+  };
+
   const handleSubmit = async () => {
     if (formData.password !== formData.confirmPassword) {
       addToast("Passwords do not match", "error");
@@ -202,7 +292,7 @@ const RegisterPharmacy = () => {
 
           {/* Stepper Navigation */}
           <div className="flex justify-between mb-8">
-            {["Owner", "Pharmacy", "Hours", "Location"].map((label, i) => (
+            {["Pharmacist", "Pharmacy", "Hours", "Location"].map((label, i) => (
               <div
                 key={i}
                 className={`flex-1 text-center ${
@@ -217,9 +307,9 @@ const RegisterPharmacy = () => {
           {/* Step 1: Owner Info */}
           {step === 1 && (
             <div className="space-y-6">
-              <input type="text" name="ownerName" value={formData.ownerName} onChange={handleFormChange} placeholder="Owner Name" className="w-full p-3 border rounded-lg" />
-              <input type="email" name="ownerEmail" value={formData.ownerEmail} onChange={handleFormChange} placeholder="Owner Email" className="w-full p-3 border rounded-lg" />
-              <input type="tel" name="ownerPhone" value={formData.ownerPhone} onChange={handleFormChange} placeholder="Owner Phone" className="w-full p-3 border rounded-lg" />
+              <input type="text" name="ownerName" value={formData.ownerName} onChange={handleFormChange} placeholder="Pharmacist Name" className="w-full p-3 border rounded-lg" />
+              <input type="email" name="ownerEmail" value={formData.ownerEmail} onChange={handleFormChange} placeholder="Pharmacist Email" className="w-full p-3 border rounded-lg" />
+              <input type="tel" name="ownerPhone" value={formData.ownerPhone} onChange={handleFormChange} placeholder="Pharmacist Phone" className="w-full p-3 border rounded-lg" />
             </div>
           )}
 
@@ -308,6 +398,46 @@ const RegisterPharmacy = () => {
                 </div>
               ) : (
                 <>
+                  {/* Current Location Button */}
+                  <div className="mb-4">
+                    <button
+                      type="button"
+                      onClick={handleUseCurrentLocation}
+                      disabled={gettingLocation}
+                      className="w-full bg-gradient-to-r from-blue-500 to-blue-600 text-white p-3 rounded-lg hover:from-blue-600 hover:to-blue-700 transition-all duration-200 flex items-center justify-center space-x-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      {gettingLocation ? (
+                        <>
+                          <svg className="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                          </svg>
+                          <span>{locationProgress || 'Getting your location...'}</span>
+                        </>
+                      ) : (
+                        <>
+                          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+                          </svg>
+                          <span>📍 Use My Current Location</span>
+                        </>
+                      )}
+                    </button>
+                    <p className="mt-2 text-sm text-gray-500 text-center">
+                      {gettingLocation 
+                        ? 'Taking multiple GPS readings for best accuracy...'
+                        : 'Uses high-precision GPS for accurate positioning'
+                      }
+                    </p>
+                  </div>
+
+                  <div className="relative flex items-center mb-4">
+                    <div className="flex-grow border-t border-gray-300"></div>
+                    <span className="flex-shrink mx-4 text-gray-500 text-sm">OR</span>
+                    <div className="flex-grow border-t border-gray-300"></div>
+                  </div>
+
                   {/* Search Box */}
                   <div className="mb-4">
                     <Autocomplete
@@ -327,7 +457,46 @@ const RegisterPharmacy = () => {
                         className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                       />
                     </Autocomplete>
+                    <p className="mt-2 text-sm text-gray-500">
+                      💡 You can also click directly on the map to set your location
+                    </p>
                   </div>
+
+                  {/* Accuracy Display */}
+                  {locationAccuracy && selectedLocation && (
+                    <div className={`mb-4 p-3 rounded-lg border ${
+                      locationAccuracy <= 30 
+                        ? 'bg-green-50 border-green-200' 
+                        : locationAccuracy <= 50
+                        ? 'bg-blue-50 border-blue-200'
+                        : 'bg-yellow-50 border-yellow-200'
+                    }`}>
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center space-x-2">
+                          <span className="text-lg">{getAccuracyQuality(locationAccuracy).emoji}</span>
+                          <div>
+                            <p className={`text-sm font-semibold ${
+                              locationAccuracy <= 30 ? 'text-green-800' : 
+                              locationAccuracy <= 50 ? 'text-blue-800' : 'text-yellow-800'
+                            }`}>
+                              {getAccuracyQuality(locationAccuracy).label} GPS Accuracy
+                            </p>
+                            <p className={`text-xs ${
+                              locationAccuracy <= 30 ? 'text-green-600' : 
+                              locationAccuracy <= 50 ? 'text-blue-600' : 'text-yellow-600'
+                            }`}>
+                              Accurate within ±{Math.round(locationAccuracy)} meters
+                            </p>
+                          </div>
+                        </div>
+                        {locationAccuracy <= 30 && (
+                          <span className="text-xs font-medium text-green-700 bg-green-100 px-2 py-1 rounded">
+                            High Precision
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  )}
                   
                   <GoogleMap
                     mapContainerStyle={mapContainerStyle}
@@ -337,20 +506,37 @@ const RegisterPharmacy = () => {
                     onLoad={onMapLoad}
                   >
                     {selectedLocation && (
-                      <Marker
-                        position={selectedLocation}
-                        draggable={true}
-                        onDragEnd={(e) => {
-                          const lat = e.latLng.lat();
-                          const lng = e.latLng.lng();
-                          setSelectedLocation({ lat, lng });
-                          setFormData((prev) => ({
-                            ...prev,
-                            latitude: lat.toFixed(6),
-                            longitude: lng.toFixed(6)
-                          }));
-                        }}
-                      />
+                      <>
+                        <Marker
+                          position={selectedLocation}
+                          draggable={true}
+                          onDragEnd={(e) => {
+                            const lat = e.latLng.lat();
+                            const lng = e.latLng.lng();
+                            setSelectedLocation({ lat, lng });
+                            setLocationAccuracy(null); // Clear accuracy when manually adjusted
+                            setFormData((prev) => ({
+                              ...prev,
+                              latitude: lat.toFixed(6),
+                              longitude: lng.toFixed(6)
+                            }));
+                          }}
+                        />
+                        {/* Accuracy Circle */}
+                        {locationAccuracy && (
+                          <Circle
+                            center={selectedLocation}
+                            radius={locationAccuracy}
+                            options={{
+                              fillColor: locationAccuracy <= 30 ? '#22c55e' : locationAccuracy <= 50 ? '#3b82f6' : '#eab308',
+                              fillOpacity: 0.15,
+                              strokeColor: locationAccuracy <= 30 ? '#16a34a' : locationAccuracy <= 50 ? '#2563eb' : '#ca8a04',
+                              strokeOpacity: 0.5,
+                              strokeWeight: 2,
+                            }}
+                          />
+                        )}
+                      </>
                     )}
                   </GoogleMap>
                   <div className="mt-4 grid grid-cols-2 gap-4">

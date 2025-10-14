@@ -93,8 +93,22 @@ export const purchaseService = {
   getPurchaseSummary: async (pharmacyId, period = 'month') => {
     const response = await axiosClient.get(`/purchases/reports/summary?pharmacy_id=${pharmacyId}&period=${period}`);
     return response.data;
+  },
+
+  // Get printable report
+  getPrintableReport: async (params = {}) => {
+    const queryParams = new URLSearchParams();
+    
+    if (params.date_from) queryParams.append('date_from', params.date_from);
+    if (params.date_to) queryParams.append('date_to', params.date_to);
+    if (params.insurance_id) queryParams.append('insurance_id', params.insurance_id);
+    if (params.report_type) queryParams.append('report_type', params.report_type);
+
+    const response = await axiosClient.get(`/purchases/reports/printable?${queryParams.toString()}`);
+    return response.data;
   }
 };
+
 
 
 

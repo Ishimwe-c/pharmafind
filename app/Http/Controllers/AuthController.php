@@ -88,23 +88,36 @@ if (!empty($validated['working_hours']) && is_array($validated['working_hours'])
     public function registerPatient(Request $request)
     {
         $validated = $request->validate([
-            'name'          => 'required|string|max:255',
-            'email'         => 'required|string|email|max:255|unique:users,email',
-            'phone_number'  => 'required|string|max:20|unique:users,phone_number',
-            'date_of_birth' => 'required|date_format:Y-m-d|before:today',
-            'password'      => 'required|string|min:6|confirmed',
-            'gender'        => 'nullable|string'
+            'name'           => 'required|string|max:255',
+            'email'          => 'required|string|email|max:255|unique:users,email',
+            'phone_number'   => 'required|string|max:20|unique:users,phone_number',
+            'date_of_birth'  => 'required|date_format:Y-m-d|before:today',
+            'password'       => 'required|string|min:6|confirmed',
+            'gender'         => 'nullable|string',
+            'marital_status' => 'nullable|in:Single,Married,Divorced,Widowed',
+            'insurances'     => 'nullable|array',
+            'insurances.*'   => 'exists:insurances,id'
         ]);
 
         $user = User::create([
-            'name'          => $validated['name'],
-            'email'         => $validated['email'],
-            'phone_number'  => $validated['phone_number'],
-            'date_of_birth' => $validated['date_of_birth'],
-            'gender'        => $validated['gender'] ?? null,
-            'password'      => Hash::make($validated['password']),
-            'role'          => 'patient',
+            'name'           => $validated['name'],
+            'email'          => $validated['email'],
+            'phone_number'   => $validated['phone_number'],
+            'date_of_birth'  => $validated['date_of_birth'],
+            'gender'         => $validated['gender'] ?? null,
+            'marital_status' => $validated['marital_status'] ?? null,
+            'password'       => Hash::make($validated['password']),
+            'role'           => 'patient',
         ]);
+
+        // Attach insurances if provided
+        if (!empty($validated['insurances'])) {
+            $user->insurances()->attach($validated['insurances'], [
+                'is_active' => true,
+                'created_at' => now(),
+                'updated_at' => now()
+            ]);
+        }
 
         $token = $user->createToken('auth_token')->plainTextToken;
 

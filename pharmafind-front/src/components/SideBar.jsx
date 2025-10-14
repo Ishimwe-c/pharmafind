@@ -48,6 +48,18 @@ const SideBar = () => {
       description: "Manage medicine inventory"
     },
     { 
+      icon: "receipt_long", 
+      label: "Purchase History", 
+      path: "/pharmacy/purchases",
+      description: "Track patient purchases and sales"
+    },
+    { 
+      icon: "print", 
+      label: "Sales Reports", 
+      path: "/pharmacy/reports",
+      description: "Generate and print purchase reports"
+    },
+    { 
       icon: "edit", 
       label: "Edit Details", 
       path: "/pharmacy/edit-details",

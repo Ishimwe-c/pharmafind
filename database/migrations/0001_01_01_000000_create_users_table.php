@@ -17,8 +17,10 @@ return new class extends Migration
         $table->date('date_of_birth')->nullable(); // Only for patients
         $table->string('email')->unique();
         $table->string('password');
-        $table->enum('role', ['patient', 'pharmacy_owner'])->default('patient');
+        $table->string('phone_number')->nullable();
+        $table->enum('role', ['patient', 'pharmacy_owner', 'admin'])->default('patient');
         $table->enum('gender', ['Male', 'Female', 'Other'])->nullable();
+        $table->enum('marital_status', ['Single', 'Married', 'Divorced', 'Widowed'])->nullable();
         $table->rememberToken();
         $table->timestamps();
         });

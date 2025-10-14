@@ -11,8 +11,9 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::table('users', function (Blueprint $table) {
-            $table->enum('gender', ['Male', 'Female', 'Other'])->nullable()->after('date_of_birth');
+        Schema::table('insurance_pharmacy', function (Blueprint $table) {
+            $table->decimal('coverage_percentage', 5, 2)->default(0)->after('insurance_id');
+            $table->timestamps();
         });
     }
 
@@ -21,8 +22,8 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::table('users', function (Blueprint $table) {
-           $table->dropColumn('gender');
+        Schema::table('insurance_pharmacy', function (Blueprint $table) {
+            $table->dropColumn(['coverage_percentage', 'created_at', 'updated_at']);
         });
     }
 };

@@ -25,11 +25,34 @@ Route::get('/pharmacies', [PharmacyController::class, 'index']);
 Route::get('/pharmacies/nearby', [PharmacyController::class, 'nearby']);
 Route::post('/contact', [ContactController::class, 'store']); // Public contact form
 
+// Public medicine viewing routes (for patients to browse)
+Route::get('/medicines', [MedicineController::class, 'index']);
+Route::get('/medicines/categories', [MedicineController::class, 'categories']);
+Route::get('/medicines/{id}', [MedicineController::class, 'show']);
+
 // Protected routes
 Route::middleware('auth:sanctum')->group(function () {
     Route::post('/logout', [AuthController::class, 'logout']);
     Route::get('/user', function (Request $request) {
-        return response()->json($request->user());
+        $user = $request->user();
+        
+        // Load pharmacy relationship for pharmacy owners
+        if ($user && ($user->role === 'pharmacy_owner' || $user->role === 'pharmacy')) {
+            $user->load(['pharmacies' => function ($query) {
+                $query->with(['insurances', 'workingHours']);
+            }]);
+            
+            // Get the first pharmacy (most users will have only one)
+            $pharmacy = $user->pharmacies->first();
+            
+            // Add pharmacy as a single object for easier access
+            $userData = $user->toArray();
+            $userData['pharmacy'] = $pharmacy;
+            
+            return response()->json($userData);
+        }
+        
+        return response()->json($user);
     });
     
     // User profile routes
@@ -46,12 +69,9 @@ Route::middleware('auth:sanctum')->group(function () {
     // Public pharmacy route (moved here to avoid conflicts)
     Route::get('/pharmacy/{id}', [PharmacyController::class, 'show']);
     
-    // Medicine management routes
+    // Medicine management routes (protected - pharmacy owners only)
     Route::prefix('medicines')->group(function () {
-        Route::get('/', [MedicineController::class, 'index']);
         Route::post('/', [MedicineController::class, 'store']);
-        Route::get('/categories', [MedicineController::class, 'categories']);
-        Route::get('/{id}', [MedicineController::class, 'show']);
         Route::put('/{id}', [MedicineController::class, 'update']);
         Route::delete('/{id}', [MedicineController::class, 'destroy']);
         Route::post('/{id}/stock', [MedicineController::class, 'updateStock']);
@@ -77,6 +97,8 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::delete('/{id}', [PurchaseController::class, 'destroy']);
         Route::get('/reports/pharmacy', [PurchaseController::class, 'pharmacyReports']);
         Route::get('/reports/insurance', [PurchaseController::class, 'insuranceReports']);
+        Route::get('/reports/printable', [PurchaseController::class, 'getPrintableReport']);
+        Route::get('/pharmacy/patients', [PurchaseController::class, 'getPharmacyPatients']);
     });
     
     // Notification routes
@@ -87,12 +109,13 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::delete('/{id}', [NotificationController::class, 'destroy']);
     });
     
-    // Insurance match alert route
+    // Insurance match alert route - Enhanced to return matches
     Route::post('/check-insurance-match', function (Request $request) {
         $validator = \Illuminate\Support\Facades\Validator::make($request->all(), [
             'latitude' => 'required|numeric',
             'longitude' => 'required|numeric',
-            'radius_km' => 'nullable|numeric|min:0.1|max:50'
+            'radius_km' => 'nullable|numeric|min:0.1|max:50',
+            'notify' => 'nullable|boolean'
         ]);
         
         if ($validator->fails()) {
@@ -106,14 +129,48 @@ Route::middleware('auth:sanctum')->group(function () {
         $user = $request->user();
         $latitude = $request->latitude;
         $longitude = $request->longitude;
-        $radiusKm = $request->get('radius_km', 5);
+        $radiusKm = $request->get('radius_km', 1);
+        $shouldNotify = $request->get('notify', true);
         
         $insuranceMatchService = new \App\Services\InsuranceMatchService();
-        $insuranceMatchService->checkInsuranceMatches($user, $latitude, $longitude, $radiusKm);
+        
+        // Get pharmacies that match user's insurance
+        $pharmacies = $insuranceMatchService->getPharmaciesForUserInsurance(
+            $user, 
+            $latitude, 
+            $longitude, 
+            $radiusKm
+        );
+        
+        $matches = [];
+        foreach ($pharmacies as $pharmacy) {
+            foreach ($pharmacy->insurances as $insurance) {
+                $matches[] = [
+                    'pharmacy_id' => $pharmacy->id,
+                    'pharmacy_name' => $pharmacy->pharmacy_name,
+                    'pharmacy_location' => $pharmacy->location,
+                    'pharmacy_latitude' => $pharmacy->latitude,
+                    'pharmacy_longitude' => $pharmacy->longitude,
+                    'insurance_id' => $insurance->id,
+                    'insurance_name' => $insurance->name,
+                    'distance_km' => round($pharmacy->distance, 2),
+                    'is_open' => $pharmacy->is_open ?? false
+                ];
+            }
+        }
+        
+        // Optionally send database notifications
+        if ($shouldNotify && count($matches) > 0) {
+            $insuranceMatchService->checkInsuranceMatches($user, $latitude, $longitude, $radiusKm);
+        }
         
         return response()->json([
             'success' => true,
-            'message' => 'Insurance match check completed. Check your notifications for any matches.'
+            'matches' => $matches,
+            'count' => count($matches),
+            'message' => count($matches) > 0 
+                ? 'Found ' . count($matches) . ' pharmacy matches with your insurance!' 
+                : 'No nearby pharmacies found that accept your insurance.'
         ]);
     });
     

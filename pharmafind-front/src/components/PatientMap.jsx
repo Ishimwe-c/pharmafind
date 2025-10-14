@@ -78,18 +78,11 @@ const PatientMap = ({ pharmacies = [], selectedInsurance = '', onPharmacySelect,
     }
   }, [isLoaded, map]);
 
-  // Calculate directions when needed
-  useEffect(() => {
-    if (showDirections && userLocation && selectedPharmacy && directionsServiceRef.current && directionsRendererRef.current) {
-      calculateDirections();
-    } else if (directionsRendererRef.current) {
-      directionsRendererRef.current.setDirections(null);
-      setDirections(null);
-    }
-  }, [showDirections, userLocation, selectedPharmacy]);
-
   const calculateDirections = useCallback(async () => {
-    if (!directionsServiceRef.current || !userLocation || !selectedPharmacy) return;
+    if (!directionsServiceRef.current || !userLocation || !selectedPharmacy) {
+      setDirectionsLoading(false);
+      return;
+    }
 
     const pharmacyCoords = selectedPharmacy.latitude && selectedPharmacy.longitude 
       ? { lat: parseFloat(selectedPharmacy.latitude), lng: parseFloat(selectedPharmacy.longitude) }
@@ -97,6 +90,7 @@ const PatientMap = ({ pharmacies = [], selectedInsurance = '', onPharmacySelect,
 
     if (!pharmacyCoords) {
       setError('Pharmacy location not available');
+      setDirectionsLoading(false);
       return;
     }
 
@@ -112,27 +106,64 @@ const PatientMap = ({ pharmacies = [], selectedInsurance = '', onPharmacySelect,
       avoidTolls: false
     };
 
+    console.log('Calculating directions...', { userLocation, pharmacyCoords });
+    
     try {
-      const result = await new Promise((resolve, reject) => {
-        directionsServiceRef.current.route(request, (result, status) => {
-          if (status === window.google.maps.DirectionsStatus.OK) {
-            resolve(result);
-          } else {
-            reject(new Error(`Directions failed: ${status}`));
-          }
-        });
-      });
+      // Add timeout to prevent hanging forever
+      const result = await Promise.race([
+        new Promise((resolve, reject) => {
+          directionsServiceRef.current.route(request, (result, status) => {
+            console.log('Directions API response:', status);
+            if (status === window.google.maps.DirectionsStatus.OK) {
+              resolve(result);
+            } else {
+              reject(new Error(`Directions failed: ${status}`));
+            }
+          });
+        }),
+        new Promise((_, reject) => 
+          setTimeout(() => reject(new Error('Directions request timed out')), 15000)
+        )
+      ]);
 
-      setDirections(result);
-      if (directionsRendererRef.current) {
-        directionsRendererRef.current.setDirections(result);
+      console.log('Directions result received:', result);
+      
+      // Validate result before setting
+      if (result && typeof result === 'object' && result.routes && result.routes.length > 0) {
+        console.log('Setting directions on map');
+        setDirections(result);
+        if (directionsRendererRef.current && map) {
+          try {
+            directionsRendererRef.current.setDirections(result);
+          } catch (dirError) {
+            console.error('Error setting directions on renderer:', dirError);
+            setError('Failed to display directions on map.');
+          }
+        }
+      } else {
+        console.log('No valid routes found');
+        setError('No route found. Please try a different location.');
       }
     } catch (err) {
+      console.error('Directions calculation error:', err);
       setError('Failed to get directions. Please try again.');
     } finally {
+      console.log('Setting directionsLoading to false');
       setDirectionsLoading(false);
     }
-  }, [userLocation, selectedPharmacy]);
+  }, [userLocation, selectedPharmacy, map]);
+
+  // Calculate directions when needed
+  useEffect(() => {
+    if (showDirections && userLocation && selectedPharmacy && directionsServiceRef.current && directionsRendererRef.current) {
+      calculateDirections();
+    } else if (!showDirections && directionsRendererRef.current && directions) {
+      // Clear directions by temporarily removing from map, then re-adding
+      directionsRendererRef.current.setMap(null);
+      directionsRendererRef.current.setMap(map);
+      setDirections(null);
+    }
+  }, [showDirections, userLocation, selectedPharmacy, map, calculateDirections]);
 
   // Handle marker click
   const handleMarkerClick = (pharmacy) => {

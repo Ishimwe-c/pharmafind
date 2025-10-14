@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
 import { useToast } from "../../context/ToastContext";
@@ -7,6 +7,7 @@ import Button from "../../components/Button";
 import LoadingSpinner from "../../components/LoadingSpinner";
 import ErrorMessage from "../../components/ErrorMessage";
 import SuccessMessage from "../../components/SuccessMessage";
+import axiosClient from "../../axios-client";
 
 /**
  * Enhanced RegisterPatient Component
@@ -38,13 +39,36 @@ export default function RegisterPatient() {
     date_of_birth: "",
     phone_number: "",
     gender: "",
+    marital_status: "",
     email: "",
     password: "",
     confirmPassword: "",
+    insurances: [], // Array of selected insurance IDs
   });
 
   // Form validation errors
   const [validationErrors, setValidationErrors] = useState({});
+  
+  // Available insurances
+  const [availableInsurances, setAvailableInsurances] = useState([]);
+  const [loadingInsurances, setLoadingInsurances] = useState(true);
+  
+  // Fetch available insurances on mount
+  useEffect(() => {
+    const fetchInsurances = async () => {
+      try {
+        const response = await axiosClient.get('/insurances');
+        setAvailableInsurances(response.data || []);
+      } catch (error) {
+        console.error('Error fetching insurances:', error);
+        addToast('Failed to load insurance options', 'error');
+      } finally {
+        setLoadingInsurances(false);
+      }
+    };
+    
+    fetchInsurances();
+  }, []);
 
   /**
    * Handle form input changes with validation
@@ -61,6 +85,28 @@ export default function RegisterPatient() {
     
     // Clear general error
     if (error) setError("");
+  };
+  
+  /**
+   * Handle insurance checkbox change
+   */
+  const handleInsuranceChange = (insuranceId) => {
+    const currentInsurances = form.insurances || [];
+    const isSelected = currentInsurances.includes(insuranceId);
+    
+    if (isSelected) {
+      // Remove insurance
+      setForm({
+        ...form,
+        insurances: currentInsurances.filter(id => id !== insuranceId)
+      });
+    } else {
+      // Add insurance
+      setForm({
+        ...form,
+        insurances: [...currentInsurances, insuranceId]
+      });
+    }
   };
 
   /**
@@ -153,6 +199,8 @@ export default function RegisterPatient() {
           date_of_birth: form.date_of_birth,
           phone_number: form.phone_number,
           gender: form.gender,
+          marital_status: form.marital_status || null,
+          insurances: form.insurances.length > 0 ? form.insurances : null,
         },
         "patient"
       );
@@ -252,7 +300,74 @@ export default function RegisterPatient() {
                     <p className="text-red-500 text-sm mt-1">{validationErrors.gender}</p>
                   )}
                 </div>
+
+                {/* Marital Status */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Marital Status
+                  </label>
+                  <select
+                    name="marital_status"
+                    value={form.marital_status}
+                    onChange={onChange}
+                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent"
+                  >
+                    <option value="">Select marital status</option>
+                    <option value="Single">Single</option>
+                    <option value="Married">Married</option>
+                    <option value="Divorced">Divorced</option>
+                    <option value="Widowed">Widowed</option>
+                  </select>
+                </div>
               </div>
+            </div>
+
+            {/* Insurance Information Section */}
+            <div className="border-b border-gray-200 pb-6">
+              <h3 className="text-lg font-semibold text-gray-800 mb-2 flex items-center">
+                <span className="material-icons text-teal-600 mr-2">local_hospital</span>
+                Insurance Information
+              </h3>
+              <p className="text-sm text-gray-600 mb-4">
+                Select the insurance(s) you have (optional - you can add this later)
+              </p>
+              
+              {loadingInsurances ? (
+                <div className="flex items-center justify-center py-4">
+                  <LoadingSpinner size="sm" text="Loading insurances..." />
+                </div>
+              ) : availableInsurances.length > 0 ? (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  {availableInsurances.map((insurance) => (
+                    <label
+                      key={insurance.id}
+                      className={`flex items-center p-3 border-2 rounded-lg cursor-pointer transition-all ${
+                        form.insurances.includes(insurance.id)
+                          ? 'border-teal-500 bg-teal-50'
+                          : 'border-gray-200 hover:border-teal-300'
+                      }`}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={form.insurances.includes(insurance.id)}
+                        onChange={() => handleInsuranceChange(insurance.id)}
+                        className="w-5 h-5 text-teal-600 border-gray-300 rounded focus:ring-teal-500"
+                      />
+                      <span className="ml-3 text-sm font-medium text-gray-700">
+                        {insurance.name}
+                      </span>
+                    </label>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-sm text-gray-500 italic">No insurances available at the moment</p>
+              )}
+              
+              {form.insurances.length > 0 && (
+                <p className="text-sm text-teal-600 mt-3">
+                  {form.insurances.length} insurance(s) selected
+                </p>
+              )}
             </div>
 
             {/* Contact Information Section */}

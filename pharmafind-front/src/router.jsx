@@ -43,6 +43,8 @@ const PharmacyLocationSettings = lazy(() => import("./views/pharmacy/PharmacyLoc
 const PharmacyWorkingHours = lazy(() => import("./views/pharmacy/PharmacyWorkingHours.jsx"));
 const PharmacyAcceptedInsurances = lazy(() => import("./views/pharmacy/PharmacyAcceptedInsurances.jsx"));
 const MedicineManagement = lazy(() => import("./views/pharmacy/MedicineManagement.jsx"));
+const PurchaseHistory = lazy(() => import("./views/pharmacy/PurchaseHistory.jsx"));
+const PurchaseReportPrint = lazy(() => import("./components/PurchaseReportPrint.jsx"));
 
 // Admin views - Lazy load for better performance
 const AdminDashboard = lazy(() => import("./views/admin/AdminDashboard.jsx"));
@@ -258,6 +260,22 @@ const router = createBrowserRouter([
         element: (
           <Suspense fallback={<LoadingSpinner size="lg" text="Loading medicine management..." />}>
             <MedicineManagement />
+          </Suspense>
+        )
+      },
+      { 
+        path: "purchases", 
+        element: (
+          <Suspense fallback={<LoadingSpinner size="lg" text="Loading purchase history..." />}>
+            <PurchaseHistory />
+          </Suspense>
+        )
+      },
+      { 
+        path: "reports", 
+        element: (
+          <Suspense fallback={<LoadingSpinner size="lg" text="Loading reports..." />}>
+            <PurchaseReportPrint />
           </Suspense>
         )
       },

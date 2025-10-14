@@ -63,7 +63,7 @@ class InsuranceMatchService
     private function findNearbyPharmacies($latitude, $longitude, $radiusKm)
     {
         $pharmacies = Pharmacy::active()
-            ->verified()
+            // Removed ->verified() to include pending pharmacies
             ->whereNotNull('latitude')
             ->whereNotNull('longitude')
             ->get();
@@ -167,13 +167,15 @@ class InsuranceMatchService
                 }
                 return $pharmacy;
             })->filter(function ($pharmacy) use ($radiusKm) {
-                return $pharmacy->distance === null || $pharmacy->distance <= $radiusKm;
+                // Only include pharmacies with valid coordinates and within radius
+                return $pharmacy->distance !== null && $pharmacy->distance <= $radiusKm;
             })->sortBy('distance');
         }
 
         return $pharmacies;
     }
 }
+
 
 
 

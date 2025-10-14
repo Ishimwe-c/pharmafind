@@ -4,10 +4,11 @@
 
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import { Search, MapPin, Save, RefreshCw, Navigation } from "lucide-react";
-import { GoogleMap, Marker, InfoWindow } from "@react-google-maps/api";
+import { GoogleMap, Marker, InfoWindow, Circle } from "@react-google-maps/api";
 import { useGoogleMaps } from "../../context/GoogleMapsContext";
 import { useAuth } from "../../context/AuthContext"; // For authentication token
 import axiosClient from "../../axios-client"; // For API calls with automatic token handling
+import geolocationService from "../../services/geolocationService";
 
 export default function LocationSettings() {
   // Get authentication token from context
@@ -33,6 +34,9 @@ export default function LocationSettings() {
   const [address, setAddress] = useState("");
   const [map, setMap] = useState(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const [gettingLocation, setGettingLocation] = useState(false);
+  const [locationAccuracy, setLocationAccuracy] = useState(null);
+  const [locationProgress, setLocationProgress] = useState(null);
 
   // Load current pharmacy location when component mounts
   useEffect(() => {
@@ -290,6 +294,77 @@ export default function LocationSettings() {
     }
   };
 
+  /**
+   * Get accuracy quality description
+   */
+  const getAccuracyQuality = (accuracy) => {
+    if (accuracy <= 10) return { label: 'Excellent', color: 'green', emoji: '🎯' };
+    if (accuracy <= 30) return { label: 'Very Good', color: 'blue', emoji: '✨' };
+    if (accuracy <= 50) return { label: 'Good', color: 'yellow', emoji: '👍' };
+    if (accuracy <= 100) return { label: 'Fair', color: 'orange', emoji: '⚠️' };
+    return { label: 'Low', color: 'red', emoji: '⚠️' };
+  };
+
+  /**
+   * Get user's current location with high precision
+   */
+  const handleUseCurrentLocation = async () => {
+    if (!geolocationService.isSupported()) {
+      setError('Geolocation is not supported by your browser');
+      return;
+    }
+
+    try {
+      setGettingLocation(true);
+      setMessage(null);
+      setError(null);
+      setLocationProgress('Acquiring GPS signal...');
+      
+      // Use high-precision mode with multiple samples
+      const location = await geolocationService.getHighPrecisionPosition(
+        (current, total) => {
+          setLocationProgress(`Reading GPS ${current}/${total}...`);
+        }
+      );
+      
+      const newPosition = {
+        lat: location.latitude,
+        lng: location.longitude
+      };
+      
+      setPosition(newPosition);
+      setLocationAccuracy(location.accuracy);
+      
+      // Pan to current location
+      if (map) {
+        map.panTo(newPosition);
+        map.setZoom(18); // Closer zoom for current location
+      }
+      
+      // Get address from coordinates
+      getAddressFromCoordinates(newPosition);
+      
+      // Show accuracy-based message
+      const quality = getAccuracyQuality(location.accuracy);
+      setMessage(
+        `${quality.emoji} Location acquired with ${quality.label.toLowerCase()} accuracy (±${Math.round(location.accuracy)}m). Remember to save your changes.`
+      );
+      
+      // Auto-clear success message after 8 seconds
+      setTimeout(() => setMessage(null), 8000);
+    } catch (err) {
+      console.error('Error getting location:', err);
+      if (err.code === 1) {
+        setError('Location permission denied. Please enable location access in your browser settings.');
+      } else {
+        setError('Could not get your current location. Please try again or use the search box.');
+      }
+    } finally {
+      setGettingLocation(false);
+      setLocationProgress(null);
+    }
+  };
+
   // Save location changes to the backend
   const handleSave = async () => {
     if (!hasChanges) return;
@@ -411,6 +486,76 @@ export default function LocationSettings() {
           </div>
         </div>
 
+        {/* Current Location Button */}
+        <div className="mb-6">
+          <button
+            type="button"
+            onClick={handleUseCurrentLocation}
+            disabled={gettingLocation}
+            className="w-full bg-gradient-to-r from-blue-500 to-blue-600 text-white p-3 rounded-lg hover:from-blue-600 hover:to-blue-700 transition-all duration-200 flex items-center justify-center space-x-2 disabled:opacity-50 disabled:cursor-not-allowed shadow-md"
+          >
+            {gettingLocation ? (
+              <>
+                <div className="animate-spin rounded-full h-5 w-5 border-2 border-white border-t-transparent"></div>
+                <span className="font-medium">{locationProgress || 'Getting your location...'}</span>
+              </>
+            ) : (
+              <>
+                <Navigation className="w-5 h-5" />
+                <span className="font-medium">📍 Use My Current Location</span>
+              </>
+            )}
+          </button>
+          <p className="mt-2 text-sm text-gray-500 text-center">
+            {gettingLocation 
+              ? 'Taking multiple GPS readings for best accuracy...'
+              : 'Uses high-precision GPS for accurate positioning'
+            }
+          </p>
+        </div>
+
+        {/* Accuracy Display */}
+        {locationAccuracy && (
+          <div className={`mb-6 p-4 rounded-lg border ${
+            locationAccuracy <= 30 
+              ? 'bg-green-50 border-green-200' 
+              : locationAccuracy <= 50
+              ? 'bg-blue-50 border-blue-200'
+              : 'bg-yellow-50 border-yellow-200'
+          }`}>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center space-x-3">
+                <span className="text-2xl">{getAccuracyQuality(locationAccuracy).emoji}</span>
+                <div>
+                  <p className={`text-sm font-semibold ${
+                    locationAccuracy <= 30 ? 'text-green-800' : 
+                    locationAccuracy <= 50 ? 'text-blue-800' : 'text-yellow-800'
+                  }`}>
+                    {getAccuracyQuality(locationAccuracy).label} GPS Accuracy
+                  </p>
+                  <p className={`text-xs ${
+                    locationAccuracy <= 30 ? 'text-green-600' : 
+                    locationAccuracy <= 50 ? 'text-blue-600' : 'text-yellow-600'
+                  }`}>
+                    Your location is accurate within ±{Math.round(locationAccuracy)} meters
+                  </p>
+                </div>
+              </div>
+              {locationAccuracy <= 30 && (
+                <span className="text-xs font-bold text-green-700 bg-green-100 px-3 py-1.5 rounded-full">
+                  High Precision
+                </span>
+              )}
+            </div>
+          </div>
+        )}
+
+        <div className="relative flex items-center mb-6">
+          <div className="flex-grow border-t border-gray-300"></div>
+          <span className="flex-shrink mx-4 text-gray-500 text-sm font-medium">OR</span>
+          <div className="flex-grow border-t border-gray-300"></div>
+        </div>
+
         {/* Search Bar */}
         <div className="relative mb-6">
           <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 w-5 h-5" />
@@ -429,6 +574,9 @@ export default function LocationSettings() {
           >
             Search
           </button>
+          <p className="mt-2 text-sm text-gray-500">
+            💡 You can also click directly on the map to set your location
+          </p>
         </div>
 
         {/* Google Map */}
@@ -463,12 +611,29 @@ export default function LocationSettings() {
             <Marker
               position={position}
               draggable={true}
-              onDragEnd={handleMarkerDrag}
+              onDragEnd={(e) => {
+                handleMarkerDrag(e);
+                setLocationAccuracy(null); // Clear accuracy when manually adjusted
+              }}
               icon={{
                 url: "https://maps.google.com/mapfiles/ms/icons/red-dot.png",
                 scaledSize: { width: 32, height: 32 }
               }}
             />
+            {/* Accuracy Circle */}
+            {locationAccuracy && (
+              <Circle
+                center={position}
+                radius={locationAccuracy}
+                options={{
+                  fillColor: locationAccuracy <= 30 ? '#22c55e' : locationAccuracy <= 50 ? '#3b82f6' : '#eab308',
+                  fillOpacity: 0.15,
+                  strokeColor: locationAccuracy <= 30 ? '#16a34a' : locationAccuracy <= 50 ? '#2563eb' : '#ca8a04',
+                  strokeOpacity: 0.5,
+                  strokeWeight: 2,
+                }}
+              />
+            )}
           </GoogleMap>
           
           {/* Fullscreen toggle button */}

@@ -17,6 +17,10 @@ class WorkingHour extends Model
         'closed'
     ];
 
+    protected $casts = [
+        'closed' => 'boolean',
+    ];
+
     // Each working hour belongs to one pharmacy
     public function pharmacy()
     {

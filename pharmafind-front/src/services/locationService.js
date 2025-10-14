@@ -73,6 +73,8 @@ export const locationService = {
           resolve({
             latitude: position.coords.latitude,
             longitude: position.coords.longitude,
+            lat: position.coords.latitude,
+            lng: position.coords.longitude,
             accuracy: position.coords.accuracy
           });
         },
@@ -88,7 +90,118 @@ export const locationService = {
     });
   },
 
-  // Watch user's location for insurance match alerts
+  // Get location with retry logic
+  getLocationWithRetry: async (maxRetries = 3, retryDelay = 2000) => {
+    let lastError;
+    
+    for (let i = 0; i < maxRetries; i++) {
+      try {
+        const location = await locationService.getCurrentLocation();
+        return location;
+      } catch (error) {
+        lastError = error;
+        console.warn(`Location attempt ${i + 1} failed:`, error.message);
+        
+        // If not the last attempt, wait before retrying
+        if (i < maxRetries - 1) {
+          await new Promise(resolve => setTimeout(resolve, retryDelay));
+        }
+      }
+    }
+    
+    throw new Error(`Failed to get location after ${maxRetries} attempts: ${lastError.message}`);
+  },
+
+  // Check if location is accurate enough
+  isLocationAccurate: (location, maxAccuracyMeters = 50) => {
+    return location && location.accuracy && location.accuracy <= maxAccuracyMeters;
+  },
+
+  // Get last known location (from local storage)
+  getLastKnownLocation: () => {
+    try {
+      const stored = localStorage.getItem('lastKnownLocation');
+      if (stored) {
+        const location = JSON.parse(stored);
+        // Only return if it's less than 1 hour old
+        const age = Date.now() - (location.timestamp || 0);
+        if (age < 3600000) { // 1 hour
+          return {
+            lat: location.lat,
+            lng: location.lng,
+            latitude: location.lat,
+            longitude: location.lng,
+            accuracy: location.accuracy
+          };
+        }
+      }
+    } catch (error) {
+      console.warn('Failed to get last known location:', error);
+    }
+    return null;
+  },
+
+  // Save location to local storage
+  saveLastKnownLocation: (location) => {
+    try {
+      localStorage.setItem('lastKnownLocation', JSON.stringify({
+        lat: location.lat || location.latitude,
+        lng: location.lng || location.longitude,
+        accuracy: location.accuracy,
+        timestamp: Date.now()
+      }));
+    } catch (error) {
+      console.warn('Failed to save last known location:', error);
+    }
+  },
+
+  // Start watching location
+  startWatching: (onSuccess, onError, options = {}) => {
+    const defaultOptions = {
+      enableHighAccuracy: true,
+      timeout: 30000,
+      maximumAge: 5000
+    };
+
+    const watchOptions = { ...defaultOptions, ...options };
+
+    if (!navigator.geolocation) {
+      if (onError) {
+        onError(new Error('Geolocation is not supported by this browser'));
+      }
+      return null;
+    }
+
+    const watchId = navigator.geolocation.watchPosition(
+      (position) => {
+        const location = {
+          latitude: position.coords.latitude,
+          longitude: position.coords.longitude,
+          lat: position.coords.latitude,
+          lng: position.coords.longitude,
+          accuracy: position.coords.accuracy
+        };
+        
+        // Save to local storage
+        locationService.saveLastKnownLocation(location);
+        
+        if (onSuccess) {
+          onSuccess(location);
+        }
+      },
+      (error) => {
+        console.error('Location watch error:', error);
+        if (onError) {
+          onError(error);
+        }
+      },
+      watchOptions
+    );
+
+    return watchId;
+  },
+
+  // Watch user's location for insurance match alerts (legacy method)
   watchLocation: (callback, options = {}) => {
     const defaultOptions = {
       enableHighAccuracy: true,
@@ -107,6 +220,8 @@ export const locationService = {
         const location = {
           latitude: position.coords.latitude,
           longitude: position.coords.longitude,
+          lat: position.coords.latitude,
+          lng: position.coords.longitude,
           accuracy: position.coords.accuracy
         };
         callback(location);

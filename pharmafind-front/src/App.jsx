@@ -11,6 +11,7 @@ import PWAInstallPrompt from './components/PWAInstallPrompt';
 import PWAStatus from './components/PWAStatus';
 import router from './router';
 import './index.css';
+import './styles/print.css';
 
 /**
  * Main App Component

@@ -22,7 +22,9 @@ const CustomTimePicker = ({ value, onChange, placeholder = "Select time" }) => {
   // Initialize with current value
   useEffect(() => {
     if (value && value.includes(':')) {
-      const [h, m] = value.split(':');
+      const parts = value.split(':');
+      const h = parts[0].padStart(2, '0');
+      const m = parts[1]?.padStart(2, '0') || '00';
       setHours(h);
       setMinutes(m);
     }
@@ -107,10 +109,25 @@ export default function WorkingHours() {
           
           // Convert backend format to frontend format
           pharmacy.working_hours.forEach(wh => {
+            // Strip seconds from time if present (HH:MM:SS -> HH:MM)
+            // Also ensures proper padding (9:00 -> 09:00)
+            const formatTime = (timeStr) => {
+              if (!timeStr) return null;
+              try {
+                const parts = timeStr.split(':');
+                if (parts.length < 2) return null;
+                const hours = parts[0].padStart(2, '0');
+                const minutes = parts[1].padStart(2, '0');
+                return `${hours}:${minutes}`; // Return only HH:MM with padding
+              } catch (error) {
+                return null;
+              }
+            };
+            
             workingHours[wh.day_of_week] = {
-              open: wh.open_time || "09:00",
-              close: wh.close_time || "18:00",
-              closed: wh.is_closed === 1
+              open: formatTime(wh.open_time) || "09:00",
+              close: formatTime(wh.close_time) || "18:00",
+              closed: !!wh.is_closed  // Convert to boolean
             };
           });
           
@@ -168,8 +185,10 @@ export default function WorkingHours() {
 
   // Validate time format (HH:MM)
   const validateTime = (time) => {
+    if (!time) return false;
+    // Accept both single and double digit hours/minutes (9:00 or 09:00)
     const timeRegex = /^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/;
-    return timeRegex.test(time);
+    return timeRegex.test(time.trim());
   };
 
   // Check if there are unsaved changes
@@ -215,7 +234,7 @@ export default function WorkingHours() {
          day_of_week: day,
          open_time: dayHours.closed ? null : dayHours.open, // Send HH:MM format directly
          close_time: dayHours.closed ? null : dayHours.close, // Send HH:MM format directly
-         closed: dayHours.closed ? 1 : 0
+         closed: dayHours.closed
        }));
       
              // Update the pharmacy with new working hours

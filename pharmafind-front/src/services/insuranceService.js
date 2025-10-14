@@ -61,6 +61,11 @@ export const insuranceService = {
     return response.data;
   },
 
+  // Alias for getAllInsurances for compatibility
+  getInsurances: async () => {
+    return insuranceService.getAllInsurances();
+  },
+
   // Get active insurances only
   getActiveInsurances: async () => {
     return insuranceService.getPatientInsurances({ active_only: true });

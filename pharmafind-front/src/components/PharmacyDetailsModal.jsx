@@ -1,6 +1,9 @@
-import React from 'react';
+import React, { useState } from 'react';
+import PharmacyMedicineList from './PharmacyMedicineList';
 
 const PharmacyDetailsModal = ({ pharmacy, isOpen, onClose, onGetDirections }) => {
+  const [activeTab, setActiveTab] = useState('details');
+  
   if (!isOpen || !pharmacy) return null;
 
   // Helper function to extract insurance names safely
@@ -41,10 +44,10 @@ const PharmacyDetailsModal = ({ pharmacy, isOpen, onClose, onGetDirections }) =>
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-      <div className="bg-white rounded-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-        <div className="p-6">
+      <div className="bg-white rounded-lg max-w-6xl w-full max-h-[90vh] overflow-hidden flex flex-col">
+        <div className="p-6 border-b border-gray-200">
           {/* Modal Header */}
-          <div className="flex items-center justify-between mb-6">
+          <div className="flex items-center justify-between mb-4">
             <h2 className="text-2xl font-bold text-gray-900">
               {pharmacy.pharmacy_name || pharmacy.name || 'Pharmacy Details'}
             </h2>
@@ -56,8 +59,41 @@ const PharmacyDetailsModal = ({ pharmacy, isOpen, onClose, onGetDirections }) =>
             </button>
           </div>
 
-          {/* Pharmacy Information */}
-          <div className="space-y-6">
+          {/* Tabs */}
+          <div className="flex space-x-1 border-b border-gray-200">
+            <button
+              onClick={() => setActiveTab('details')}
+              className={`px-4 py-2 font-medium text-sm transition-colors relative ${
+                activeTab === 'details'
+                  ? 'text-teal-600 border-b-2 border-teal-600'
+                  : 'text-gray-600 hover:text-gray-900'
+              }`}
+            >
+              <span className="flex items-center">
+                <span className="material-icons text-sm mr-2">info</span>
+                Details
+              </span>
+            </button>
+            <button
+              onClick={() => setActiveTab('medicines')}
+              className={`px-4 py-2 font-medium text-sm transition-colors relative ${
+                activeTab === 'medicines'
+                  ? 'text-teal-600 border-b-2 border-teal-600'
+                  : 'text-gray-600 hover:text-gray-900'
+              }`}
+            >
+              <span className="flex items-center">
+                <span className="material-icons text-sm mr-2">medication</span>
+                Available Medicines
+              </span>
+            </button>
+          </div>
+        </div>
+
+        {/* Tab Content */}
+        <div className="flex-1 overflow-y-auto p-6">
+          {activeTab === 'details' && (
+            <div className="space-y-6">
             {/* Status */}
             <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
               <div className="flex items-center">
@@ -137,36 +173,46 @@ const PharmacyDetailsModal = ({ pharmacy, isOpen, onClose, onGetDirections }) =>
               </div>
             </div>
 
-            {/* Working Hours */}
-            {pharmacy.working_hours && pharmacy.working_hours.length > 0 && (
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-3">
-                  <span className="material-icons text-sm mr-1">schedule</span>
-                  Working Hours
-                </label>
-                <div className="bg-gray-50 p-4 rounded-lg">
-                  <div className="space-y-2">
-                    {pharmacy.working_hours.map((hour, index) => (
-                      <div key={index} className="flex justify-between items-center">
-                        <span className="font-medium text-gray-700">
-                          {hour.day_of_week}
-                        </span>
-                        <span className="text-gray-600">
-                          {hour.closed 
-                            ? 'Closed' 
-                            : `${hour.open_time || 'N/A'} - ${hour.close_time || 'N/A'}`
-                          }
-                        </span>
-                      </div>
-                    ))}
+              {/* Working Hours */}
+              {pharmacy.working_hours && pharmacy.working_hours.length > 0 && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-3">
+                    <span className="material-icons text-sm mr-1">schedule</span>
+                    Working Hours
+                  </label>
+                  <div className="bg-gray-50 p-4 rounded-lg">
+                    <div className="space-y-2">
+                      {pharmacy.working_hours.map((hour, index) => (
+                        <div key={index} className="flex justify-between items-center">
+                          <span className="font-medium text-gray-700">
+                            {hour.day_of_week}
+                          </span>
+                          <span className="text-gray-600">
+                            {hour.closed 
+                              ? 'Closed' 
+                              : `${hour.open_time || 'N/A'} - ${hour.close_time || 'N/A'}`
+                            }
+                          </span>
+                        </div>
+                      ))}
+                    </div>
                   </div>
                 </div>
-              </div>
-            )}
-          </div>
+              )}
+            </div>
+          )}
 
-          {/* Modal Actions */}
-          <div className="flex justify-end space-x-4 mt-8 pt-6 border-t border-gray-200">
+          {activeTab === 'medicines' && (
+            <PharmacyMedicineList 
+              pharmacyId={pharmacy.id} 
+              isOpen={isOpenStatus}
+            />
+          )}
+        </div>
+
+        {/* Modal Actions Footer */}
+        <div className="p-6 border-t border-gray-200 bg-gray-50">
+          <div className="flex justify-end space-x-4">
             <button
               onClick={onClose}
               className="px-6 py-2 text-gray-600 hover:text-gray-800 font-medium transition-colors"
@@ -175,8 +221,9 @@ const PharmacyDetailsModal = ({ pharmacy, isOpen, onClose, onGetDirections }) =>
             </button>
             <button
               onClick={handleGetDirections}
-              className="px-6 py-2 bg-purple-600 text-white font-medium rounded-lg hover:bg-purple-700 transition-colors"
+              className="px-6 py-2 bg-purple-600 text-white font-medium rounded-lg hover:bg-purple-700 transition-colors flex items-center"
             >
+              <span className="material-icons text-sm mr-2">directions</span>
               Show Directions on Map
             </button>
           </div>

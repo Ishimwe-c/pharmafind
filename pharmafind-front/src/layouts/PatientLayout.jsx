@@ -3,6 +3,7 @@ import { Navigate, Outlet, Link, useLocation, useNavigate } from 'react-router-d
 import { AuthContext } from '../context/AuthContext.jsx';
 import { useSidebar } from '../context/SidebarContext.jsx';
 import { useContext } from 'react';
+import InsuranceMatchTracker from '../components/InsuranceMatchTracker';
 // import { Home, User, LogOut, History } from 'lucide-react';
 
 // PatientLayout.jsx - Only allows patients
@@ -280,6 +281,9 @@ export default function PatientLayout() {
           </div>
         </main>
       </div>
+      
+      {/* Insurance Match Tracker - Floating component */}
+      <InsuranceMatchTracker />
     </div>
   );
 }

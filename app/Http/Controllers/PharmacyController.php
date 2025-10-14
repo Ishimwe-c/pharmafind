@@ -109,16 +109,9 @@ class PharmacyController extends Controller
     if (!$pharmacy) {
         return response()->json(['message' => 'No pharmacy found for this user'], 404);
     }
-    //calculate if pharmacy is open
-    $currentDay = now()->format('l');
-    $currentTIme = now()->format("H:i");
-
-    $isOpen = $pharmacy->workingHours()
-        ->where('day_of_week', $currentDay)
-        ->where('closed', false)
-        ->where('open_time', '<=', $currentTIme)
-        ->where('close_time', '>=', $currentTIme)
-        ->exists();
+    
+    // Calculate if pharmacy is open
+    $isOpen = $pharmacy->isCurrentlyOpen();
 
 
             return response()->json([
@@ -155,6 +148,9 @@ class PharmacyController extends Controller
             return response()->json(['message' => 'Pharmacy not found'], 404);
         }
 
+        // Calculate if pharmacy is open
+        $pharmacy->is_open = $pharmacy->isCurrentlyOpen();
+
         return response()->json($pharmacy);
     }
 
@@ -187,12 +183,12 @@ class PharmacyController extends Controller
             'insurances.*'  => ['string'],
 
             'working_hours'                 => ['nullable','array'],
-            'working_hours.*.day_of_week'   => [Rule::in([
+            'working_hours.*.day_of_week'   => ['required_with:working_hours', Rule::in([
                 'Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'
             ])],
             'working_hours.*.open_time'     => ['nullable','date_format:H:i'],
             'working_hours.*.close_time'    => ['nullable','date_format:H:i'],
-            'working_hours.*.closed'        => ['nullable','boolean'],
+            'working_hours.*.closed'        => ['nullable'],
         ]);
 
         DB::transaction(function () use (&$pharmacy, $validated) {
@@ -308,18 +304,8 @@ class PharmacyController extends Controller
     }
      $pharmacies = $query->get();
     // ✅ Add "is_open" field to each pharmacy
-    $currentDay  = now()->format('l');    // e.g. "Monday"
-    $currentTime = now()->format('H:i');  // e.g. "14:30"
-
-    $pharmacies->transform(function ($pharmacy) use ($currentDay, $currentTime) {
-        $isOpen = $pharmacy->workingHours()
-            ->where('day_of_week', $currentDay)
-            ->where('closed', false)
-            ->where('open_time', '<=', $currentTime)
-            ->where('close_time', '>=', $currentTime)
-            ->exists();
-
-        $pharmacy->is_open = $isOpen;
+    $pharmacies->transform(function ($pharmacy) {
+        $pharmacy->is_open = $pharmacy->isCurrentlyOpen();
         return $pharmacy;
     });
 
@@ -371,15 +357,7 @@ class PharmacyController extends Controller
 
      // Format response
      $formattedPharmacies = $pharmacies->map(function ($pharmacy) {
-         $currentDay = now()->format('l');
-         $currentTime = now()->format("H:i");
-
-         $isOpen = $pharmacy->workingHours()
-             ->where('day_of_week', $currentDay)
-             ->where('closed', false)
-             ->where('open_time', '<=', $currentTime)
-             ->where('close_time', '>=', $currentTime)
-             ->exists();
+         $isOpen = $pharmacy->isCurrentlyOpen();
 
          return [
              'id' => $pharmacy->id,

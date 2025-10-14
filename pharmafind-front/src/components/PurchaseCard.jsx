@@ -137,11 +137,6 @@ export default function PurchaseCard({
           <div className="mt-3 pt-3 border-t border-gray-200">
             <p className="text-sm font-medium text-gray-700">Insurance</p>
             <p className="text-sm text-gray-900">{purchase.insurance.name}</p>
-            {purchase.insurance_coverage > 0 && (
-              <p className="text-sm text-green-600">
-                Coverage: {formatCurrency(purchase.insurance_coverage)}
-              </p>
-            )}
           </div>
         )}
 
@@ -151,15 +146,17 @@ export default function PurchaseCard({
             <span className="text-gray-600">Total Amount:</span>
             <span className="font-medium">{formatCurrency(purchase.total_amount)}</span>
           </div>
-          {purchase.insurance_coverage > 0 && (
+          {purchase.insurance && (
             <div className="flex justify-between text-sm">
               <span className="text-gray-600">Insurance Coverage:</span>
-              <span className="text-green-600">-{formatCurrency(purchase.insurance_coverage)}</span>
+              <span className={parseFloat(purchase.insurance_coverage || 0) > 0 ? 'text-green-600' : 'text-gray-500'}>
+                {parseFloat(purchase.insurance_coverage || 0) > 0 ? '-' : ''}{formatCurrency(purchase.insurance_coverage || 0)}
+              </span>
             </div>
           )}
           <div className="flex justify-between text-sm font-medium border-t border-gray-200 pt-1 mt-1">
-            <span>Patient Payment:</span>
-            <span>{formatCurrency(purchase.patient_payment)}</span>
+            <span className="text-gray-700">Patient Payment:</span>
+            <span className="text-teal-600">{formatCurrency(purchase.patient_payment)}</span>
           </div>
         </div>
       </div>
@@ -227,6 +224,7 @@ export default function PurchaseCard({
     </div>
   );
 }
+
 
 
 

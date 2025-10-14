@@ -51,7 +51,7 @@ export const useDirections = () => {
   const startLocationWatching = useCallback(() => {
     if (watchIdRef.current) return;
 
-    locationService.startWatching(
+    const watchId = locationService.startWatching(
       (location) => {
         setUserLocation({ lat: location.lat, lng: location.lng });
         setLocationAccuracy(Math.round(location.accuracy));
@@ -71,6 +71,8 @@ export const useDirections = () => {
         maximumAge: 5000
       }
     );
+    
+    watchIdRef.current = watchId;
 
     // Auto-stop watching after 30 seconds to save battery
     retryTimeoutRef.current = setTimeout(() => {

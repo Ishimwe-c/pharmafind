@@ -63,6 +63,25 @@ class Pharmacy extends Model
         return $this->hasMany(Purchase::class);
     }
 
+    /**
+     * Sync all insurances with default coverage percentage
+     */
+    public function syncAllInsurances($coveragePercentage = 80)
+    {
+        $insurances = Insurance::all();
+        $syncData = [];
+        
+        foreach ($insurances as $insurance) {
+            $syncData[$insurance->id] = [
+                'coverage_percentage' => $coveragePercentage,
+                'created_at' => now(),
+                'updated_at' => now()
+            ];
+        }
+        
+        $this->insurances()->syncWithoutDetaching($syncData);
+    }
+
     // Scope for active pharmacies (visible to users)
     public function scopeActive($query)
     {
@@ -79,5 +98,25 @@ class Pharmacy extends Model
     public function scopePendingVerification($query)
     {
         return $query->where('verification_status', 'pending');
+    }
+
+    /**
+     * Check if pharmacy is currently open based on working hours
+     */
+    public function isCurrentlyOpen()
+    {
+        $currentDay = now()->format('l');
+        $currentTime = now()->format("H:i:s");
+
+        $workingHour = $this->workingHours()
+            ->where('day_of_week', $currentDay)
+            ->where('closed', 0)
+            ->first();
+
+        if (!$workingHour) {
+            return false;
+        }
+
+        return $workingHour->open_time <= $currentTime && $workingHour->close_time >= $currentTime;
     }
 }

@@ -1,0 +1,264 @@
+/* Print Styles for Purchase Reports */
+
+@media print {
+  /* Hide non-essential elements when printing */
+  .print\\:hidden {
+    display: none !important;
+  }
+
+  /* Ensure content fits on page */
+  body {
+    print-color-adjust: exact;
+    -webkit-print-color-adjust: exact;
+  }
+
+  /* Page setup */
+  @page {
+    size: A4;
+    margin: 1.5cm;
+  }
+
+  /* Prevent page breaks inside elements */
+  .page-break-inside-avoid {
+    page-break-inside: avoid;
+    break-inside: avoid;
+  }
+
+  /* Prevent page break after element (keep with next) */
+  .page-break-after-avoid {
+    page-break-after: avoid;
+    break-after: avoid;
+  }
+
+  /* Force page break before */
+  .page-break-before {
+    page-break-before: always;
+    break-before: always;
+  }
+
+  /* Force page break after */
+  .page-break-after {
+    page-break-after: always;
+    break-after: always;
+  }
+
+  /* Purchase items - try to keep together, but allow breaking for very large items */
+  .print-purchase-item {
+    page-break-inside: auto;
+    break-inside: auto;
+  }
+
+  /* Keep purchase header together */
+  .print-purchase-item > div:first-child {
+    page-break-after: avoid;
+  }
+
+  /* Purchase item tables can break if they're very long */
+  .print-purchase-item table {
+    page-break-inside: auto;
+  }
+
+  /* Keep table rows together when possible */
+  .print-purchase-item table tr {
+    page-break-inside: avoid;
+  }
+
+  /* Table headers repeat on each page */
+  .print-table-header {
+    display: table-header-group;
+  }
+
+  /* Remove shadows and rounded corners for cleaner print */
+  .print\\:shadow-none {
+    box-shadow: none !important;
+  }
+
+  /* Ensure text is black for better print quality */
+  .print\\:text-black {
+    color: #000 !important;
+  }
+
+  /* Ensure borders are visible in print */
+  .print\\:border {
+    border: 1px solid #d1d5db !important;
+  }
+
+  /* Tables - allow breaking across pages */
+  table {
+    page-break-inside: auto;
+    width: 100%;
+  }
+
+  /* Table rows - try to avoid breaking, but allow if necessary */
+  tr {
+    page-break-inside: avoid;
+    page-break-after: auto;
+  }
+
+  /* Table headers - repeat on each page */
+  thead {
+    display: table-header-group;
+  }
+
+  /* Table footers */
+  tfoot {
+    display: table-footer-group;
+  }
+
+  /* Ensure table cells don't break */
+  td, th {
+    page-break-inside: avoid;
+  }
+
+  /* Ensure colors are printed */
+  * {
+    print-color-adjust: exact;
+    -webkit-print-color-adjust: exact;
+  }
+
+  /* Remove backgrounds that might waste ink */
+  .print\\:bg-white {
+    background-color: #fff !important;
+  }
+
+  /* Optimize link display */
+  a[href]:after {
+    content: none !important;
+  }
+
+  /* Hide navigation, header, footer from app - CRITICAL */
+  nav,
+  header,
+  footer,
+  aside,
+  .sidebar,
+  .no-print,
+  [class*="sidebar"],
+  [class*="Sidebar"] {
+    display: none !important;
+    visibility: hidden !important;
+    opacity: 0 !important;
+    width: 0 !important;
+    height: 0 !important;
+    overflow: hidden !important;
+  }
+
+  /* Specifically hide the blue sidebar component */
+  aside[class*="bg-gradient"],
+  aside[class*="bg-blue"],
+  div[class*="sidebar-scroll"] {
+    display: none !important;
+    visibility: hidden !important;
+  }
+
+  /* Remove flex layout constraints */
+  .flex {
+    display: block !important;
+  }
+
+  .flex-1 {
+    flex: none !important;
+    width: 100% !important;
+  }
+
+  /* Remove height constraints from parent containers */
+  .h-screen {
+    height: auto !important;
+  }
+
+  /* Ensure main content takes full width without sidebar */
+  .flex-shrink-0 {
+    display: none !important;
+  }
+
+  /* Expand containers to full width */
+  .container,
+  .mx-auto {
+    width: 100% !important;
+    max-width: none !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+
+  /* Remove any height constraints and scrollbars */
+  body, html {
+    overflow: visible !important;
+    height: auto !important;
+    max-height: none !important;
+  }
+
+  /* Ensure main content areas don't have scrollbars - CRITICAL */
+  main, .main-content, div[class*="scroll"], div[class*="overflow"] {
+    overflow: visible !important;
+    overflow-y: visible !important;
+    overflow-x: visible !important;
+    height: auto !important;
+    max-height: none !important;
+    min-height: 0 !important;
+  }
+
+  /* Force all divs to not scroll */
+  div {
+    overflow: visible !important;
+  }
+
+  /* Remove rounded corners in print */
+  * {
+    border-radius: 0 !important;
+  }
+
+  /* Ensure space-y classes don't add margins in print */
+  .print\\:space-y-0 > * {
+    margin-top: 0 !important;
+    margin-bottom: 0 !important;
+  }
+
+  .print\\:block {
+    display: block !important;
+  }
+
+  /* Reset all spacing utilities in print for better control */
+  [class*="space-"] {
+    gap: 0 !important;
+  }
+}
+
+/* Additional print-specific overrides */
+@media print {
+  @page {
+    size: A4 portrait;
+    margin: 1.5cm;
+  }
+
+  /* Absolutely critical - override ALL potential scroll containers */
+  * {
+    overflow: visible !important;
+    max-height: none !important;
+  }
+
+  /* Nuclear option - hide sidebar by any means necessary */
+  aside,
+  [role="complementary"],
+  nav[class*="sidebar"],
+  div[class*="w-72"],
+  div[class*="w-16"] {
+    display: none !important;
+    position: absolute !important;
+    left: -9999px !important;
+  }
+
+  /* Ensure print-only content takes full space */
+  .print\\:p-0 {
+    padding: 0 !important;
+  }
+
+  /* Make sure body and root elements don't have flex that could show sidebar */
+  body > div,
+  #root {
+    display: block !important;
+  }
+}
+
+
+
+
