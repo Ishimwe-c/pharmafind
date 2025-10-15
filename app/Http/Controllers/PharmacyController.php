@@ -326,12 +326,14 @@ class PharmacyController extends Controller
          'lng' => 'required|numeric|between:-180,180',
          'radius' => 'nullable|numeric|min:0.1|max:100', // km
          'insurance' => 'nullable|string',
+         'limit' => 'nullable|integer|min:1|max:20', // max 20 results
      ]);
 
      $lat = $validated['lat'];
      $lng = $validated['lng'];
      $radius = $validated['radius'] ?? 10; // default 10km
      $insurance = $validated['insurance'] ?? null;
+     $limit = $validated['limit'] ?? 10; // default 10 results
 
      // Use Haversine formula for accurate distance calculation
      $haversine = "(6371 * acos(cos(radians($lat)) 
@@ -354,6 +356,41 @@ class PharmacyController extends Controller
      }
 
      $pharmacies = $query->get();
+
+     // If we have fewer than 3 results and insurance filter is applied, 
+     // expand search to ensure user gets at least 3 results
+     if ($pharmacies->count() < 3 && $insurance) {
+         $expandedQuery = Pharmacy::with(['insurances:id,name', 'workingHours'])
+             ->select('*')
+             ->selectRaw("$haversine AS distance")
+             ->having('distance', '<=', 100) // 100km radius
+             ->orderBy('distance');
+         
+         $expandedQuery->whereHas('insurances', function ($q) use ($insurance) {
+             $q->where('name', 'like', "%{$insurance}%");
+         });
+         
+         $expandedPharmacies = $expandedQuery->get();
+         
+         // If we still don't have enough results, get all pharmacies with this insurance
+         if ($expandedPharmacies->count() < 3) {
+             $allQuery = Pharmacy::with(['insurances:id,name', 'workingHours'])
+                 ->select('*')
+                 ->selectRaw("$haversine AS distance")
+                 ->orderBy('distance');
+             
+             $allQuery->whereHas('insurances', function ($q) use ($insurance) {
+                 $q->where('name', 'like', "%{$insurance}%");
+             });
+             
+             $allPharmacies = $allQuery->get();
+             
+             // Take the first results up to the limit to ensure we have enough options
+             $pharmacies = $allPharmacies->take($limit);
+         } else {
+             $pharmacies = $expandedPharmacies;
+         }
+     }
 
      // Format response
      $formattedPharmacies = $pharmacies->map(function ($pharmacy) {

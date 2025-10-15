@@ -14,6 +14,23 @@ export const useDirections = () => {
   
   const watchIdRef = useRef(null);
   const retryTimeoutRef = useRef(null);
+  const lastPositionRef = useRef(null);
+  const isMovingRef = useRef(false);
+
+  /**
+   * Calculate distance between two points in kilometers
+   */
+  const calculateDistance = useCallback((lat1, lng1, lat2, lng2) => {
+    const R = 6371; // Earth's radius in kilometers
+    const dLat = (lat2 - lat1) * Math.PI / 180;
+    const dLng = (lng2 - lng1) * Math.PI / 180;
+    const a = 
+      Math.sin(dLat/2) * Math.sin(dLat/2) +
+      Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * 
+      Math.sin(dLng/2) * Math.sin(dLng/2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+    return R * c;
+  }, []);
 
   /**
    * Get user's current location with high accuracy
@@ -32,10 +49,8 @@ export const useDirections = () => {
       setLocationAccuracy(Math.round(location.accuracy));
       setShowDirections(true);
       
-      // If location is not accurate enough, start watching for better accuracy
-      if (!locationService.isLocationAccurate(location, 50)) {
-        startLocationWatching();
-      }
+      // Start continuous tracking for real-time updates like Google Maps
+      startLocationWatching();
       
     } catch (error) {
       console.error('Location error:', error);
@@ -46,20 +61,34 @@ export const useDirections = () => {
   }, [isGettingLocation]);
 
   /**
-   * Start watching location for better accuracy
+   * Start watching location for continuous tracking (like Google Maps)
    */
   const startLocationWatching = useCallback(() => {
     if (watchIdRef.current) return;
 
     const watchId = locationService.startWatching(
       (location) => {
-        setUserLocation({ lat: location.lat, lng: location.lng });
+        const newLocation = { lat: location.lat, lng: location.lng };
+        
+        // Calculate movement distance
+        if (lastPositionRef.current) {
+          const distance = calculateDistance(
+            lastPositionRef.current.lat,
+            lastPositionRef.current.lng,
+            newLocation.lat,
+            newLocation.lng
+          );
+          
+          // Consider user moving if they've moved more than 10 meters
+          isMovingRef.current = distance > 0.01; // 0.01 km = 10 meters
+        }
+        
+        lastPositionRef.current = newLocation;
+        setUserLocation(newLocation);
         setLocationAccuracy(Math.round(location.accuracy));
         
-        // Stop watching if we get accurate enough location
-        if (locationService.isLocationAccurate(location, 50)) {
-          stopLocationWatching();
-        }
+        // Keep watching continuously - don't stop for accuracy
+        // This provides real-time location updates like Google Maps
       },
       (error) => {
         console.warn('Location watch error:', error.message);
@@ -68,16 +97,14 @@ export const useDirections = () => {
       {
         enableHighAccuracy: true,
         timeout: 30000,
-        maximumAge: 5000
+        maximumAge: isMovingRef.current ? 1000 : 3000 // More frequent updates when moving
       }
     );
     
     watchIdRef.current = watchId;
 
-    // Auto-stop watching after 30 seconds to save battery
-    retryTimeoutRef.current = setTimeout(() => {
-      stopLocationWatching();
-    }, 30000);
+    // No auto-stop timeout - keep tracking continuously like Google Maps
+    // Users can manually stop tracking by toggling directions off
   }, []);
 
   /**
@@ -102,9 +129,18 @@ export const useDirections = () => {
     if (!userLocation) {
       getUserLocation();
     } else {
-      setShowDirections(!showDirections);
+      const newShowDirections = !showDirections;
+      setShowDirections(newShowDirections);
+      
+      // If turning off directions, stop continuous tracking
+      if (!newShowDirections) {
+        stopLocationWatching();
+      } else {
+        // If turning on directions, start continuous tracking
+        startLocationWatching();
+      }
     }
-  }, [userLocation, showDirections, getUserLocation]);
+  }, [userLocation, showDirections, getUserLocation, startLocationWatching, stopLocationWatching]);
 
   /**
    * Clear location and directions
@@ -124,11 +160,13 @@ export const useDirections = () => {
     if (!userLocation) {
       getUserLocation().then(() => {
         setShowDirections(true);
+        startLocationWatching(); // Start continuous tracking
       });
     } else {
       setShowDirections(true);
+      startLocationWatching(); // Start continuous tracking
     }
-  }, [userLocation, getUserLocation]);
+  }, [userLocation, getUserLocation, startLocationWatching]);
 
   // Cleanup on unmount
   useEffect(() => {

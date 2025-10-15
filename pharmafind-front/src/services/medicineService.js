@@ -66,23 +66,29 @@ export const medicineService = {
   },
 
   // Get medicines by category
-  getMedicinesByCategory: async (category) => {
-    return medicineService.getMedicines({ category });
+  getMedicinesByCategory: async (category, pharmacyId = null) => {
+    const params = { category };
+    if (pharmacyId) params.pharmacy_id = pharmacyId;
+    return medicineService.getMedicines(params);
   },
 
   // Get low stock medicines
-  getLowStockMedicines: async (threshold = 10) => {
-    const medicines = await medicineService.getMedicines();
+  getLowStockMedicines: async (threshold = 10, pharmacyId = null) => {
+    const params = pharmacyId ? { pharmacy_id: pharmacyId } : {};
+    const medicines = await medicineService.getMedicines(params);
     return medicines.data.filter(medicine => 
       medicine.stock_quantity > 0 && medicine.stock_quantity <= threshold
     );
   },
 
   // Get out of stock medicines
-  getOutOfStockMedicines: async () => {
-    return medicineService.getMedicines({ in_stock: false });
+  getOutOfStockMedicines: async (pharmacyId = null) => {
+    const params = { in_stock: false };
+    if (pharmacyId) params.pharmacy_id = pharmacyId;
+    return medicineService.getMedicines(params);
   }
 };
+
 
 
 

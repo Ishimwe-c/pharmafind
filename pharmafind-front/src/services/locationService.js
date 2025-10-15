@@ -160,7 +160,7 @@ export const locationService = {
     const defaultOptions = {
       enableHighAccuracy: true,
       timeout: 30000,
-      maximumAge: 5000
+      maximumAge: 2000 // Reduced for more frequent updates like Google Maps
     };
 
     const watchOptions = { ...defaultOptions, ...options };

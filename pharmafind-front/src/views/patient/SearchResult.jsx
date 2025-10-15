@@ -6,6 +6,7 @@ import PatientMap from "../../components/PatientMap";
 import PharmacyDetailsModal from "../../components/PharmacyDetailsModal";
 import { useDirections } from "../../hooks/useDirections";
 import { useDrivingDistance } from "../../hooks/useDrivingDistance";
+import { sortPharmaciesByDistance, randomizeArray } from "../../utils/locationUtils";
 
 // Reusable PharmacyCard component
 const PharmacyCard = ({ pharmacy, onSelect, userLocation, drivingDistance, isCalculatingDistance }) => {
@@ -42,6 +43,20 @@ const PharmacyCard = ({ pharmacy, onSelect, userLocation, drivingDistance, isCal
     
     if (drivingDistance) {
       return drivingDistance.text || `${drivingDistance.miles.toFixed(1)} mi`;
+    }
+    
+    // Fallback to Haversine distance if driving distance not available
+    // Convert km to miles for consistent display
+    if (pharmacy.distance_km !== undefined) {
+      const distanceMiles = pharmacy.distance_km * 0.621371; // Convert km to miles
+      
+      // Handle very close distances (less than 0.1 miles)
+      if (distanceMiles < 0.1) {
+        const distanceFeet = distanceMiles * 5280; // Convert to feet
+        return distanceFeet < 100 ? `${Math.round(distanceFeet)} ft` : `${distanceMiles.toFixed(2)} mi`;
+      }
+      
+      return `${distanceMiles.toFixed(1)} mi`;
     }
     
     return 'Distance unavailable';
@@ -150,6 +165,7 @@ const SearchResults = () => {
   const [searchQuery, setSearchQuery] = useState("");
   const [filteredPharmacies, setFilteredPharmacies] = useState([]);
   const [insuranceFilter, setInsuranceFilter] = useState("");
+  const [hasDirections, setHasDirections] = useState(false);
   // Use the new directions hook
   const {
     userLocation,
@@ -171,14 +187,19 @@ const SearchResults = () => {
     formatDistance
   } = useDrivingDistance();
 
-  // Get insurance filter from URL params
+  // Get insurance filter from URL params and request location
   useEffect(() => {
     const insurance = searchParams.get('insurance');
     if (insurance) {
       setInsuranceFilter(insurance);
       setSearchQuery(insurance); // Pre-fill search with insurance
+      
+      // Automatically request location when searching by insurance
+      if (!userLocation && !isGettingLocation) {
+        getUserLocation();
+      }
     }
-  }, [searchParams]);
+  }, [searchParams, userLocation, isGettingLocation, getUserLocation]);
 
   // Calculate driving distances when user location or pharmacies change
   useEffect(() => {
@@ -191,6 +212,13 @@ const SearchResults = () => {
   useEffect(() => {
     fetchPharmacies();
   }, []);
+
+  // Fetch nearby pharmacies when location is available and searching by insurance
+  useEffect(() => {
+    if (userLocation && insuranceFilter && !isGettingLocation) {
+      fetchNearbyPharmacies();
+    }
+  }, [userLocation, insuranceFilter, isGettingLocation]);
 
   const fetchPharmacies = async () => {
     try {
@@ -247,7 +275,58 @@ const SearchResults = () => {
     }
   };
 
-  // Filter pharmacies based on search query and insurance filter
+  const fetchNearbyPharmacies = async () => {
+    try {
+      setLoading(true);
+      const params = new URLSearchParams();
+      params.append('lat', userLocation.lat);
+      params.append('lng', userLocation.lng);
+      params.append('radius', '50'); // 50km radius for broader search
+      params.append('limit', '10'); // Request up to 10 results
+      if (insuranceFilter) {
+        params.append('insurance', insuranceFilter);
+      }
+      
+      const response = await axiosClient.get(`/pharmacies/nearby?${params.toString()}`);
+      const nearbyResults = response.data;
+      
+      // If we have fewer than 3 results, also fetch all pharmacies with this insurance
+      if (nearbyResults.length < 3 && insuranceFilter) {
+        try {
+          const allParams = new URLSearchParams();
+          allParams.append('insurance', insuranceFilter);
+          const allResponse = await axiosClient.get(`/pharmacies?${allParams.toString()}`);
+          const allResults = allResponse.data;
+          
+          // Combine results, prioritizing nearby ones, and ensure we have at least 3
+          const combinedResults = [...nearbyResults];
+          const nearbyIds = new Set(nearbyResults.map(p => p.id));
+          
+          // Add results from all pharmacies that aren't already in nearby results
+          for (const pharmacy of allResults) {
+            if (!nearbyIds.has(pharmacy.id) && combinedResults.length < 10) {
+              combinedResults.push(pharmacy);
+            }
+          }
+          
+          setPharmacies(combinedResults);
+        } catch (allErr) {
+          console.error("Error fetching all pharmacies:", allErr);
+          setPharmacies(nearbyResults);
+        }
+      } else {
+        setPharmacies(nearbyResults);
+      }
+    } catch (err) {
+      console.error("Error fetching nearby pharmacies:", err);
+      // Fallback to regular pharmacy fetch if nearby API fails
+      fetchPharmacies();
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Filter and sort pharmacies based on search query and insurance filter
   useEffect(() => {
     let filtered = pharmacies;
 
@@ -265,27 +344,66 @@ const SearchResults = () => {
       });
     }
 
-         // Then filter by search query if specified
-     if (searchQuery.trim()) {
-       filtered = filtered.filter(pharmacy => {
-         const query = searchQuery.toLowerCase();
-         const nameMatch = (pharmacy.pharmacy_name || pharmacy.name)?.toLowerCase().includes(query);
-         const locationMatch = pharmacy.location?.toLowerCase().includes(query);
-         
-         // Check insurance names (handle both object and string formats)
-         const insuranceMatch = pharmacy.insurances?.some(ins => {
-           const insuranceName = typeof ins === 'object' && ins !== null && ins.name 
-             ? ins.name.toLowerCase() 
-             : String(ins).toLowerCase();
-           return insuranceName.includes(query);
-         });
+    // Then filter by search query if specified
+    if (searchQuery.trim()) {
+      filtered = filtered.filter(pharmacy => {
+        const query = searchQuery.toLowerCase();
+        const nameMatch = (pharmacy.pharmacy_name || pharmacy.name)?.toLowerCase().includes(query);
+        const locationMatch = pharmacy.location?.toLowerCase().includes(query);
+        
+        // Check insurance names (handle both object and string formats)
+        const insuranceMatch = pharmacy.insurances?.some(ins => {
+          const insuranceName = typeof ins === 'object' && ins !== null && ins.name 
+            ? ins.name.toLowerCase() 
+            : String(ins).toLowerCase();
+          return insuranceName.includes(query);
+        });
 
-         return nameMatch || locationMatch || insuranceMatch;
-       });
-     }
+        return nameMatch || locationMatch || insuranceMatch;
+      });
+    }
+
+    // Sort pharmacies by distance if location is available, otherwise randomize
+    if (userLocation && filtered.length > 0) {
+      // Create a unified sorting function that handles both driving and Haversine distances
+      filtered = filtered.sort((a, b) => {
+        // Get driving distance if available
+        const drivingDistanceA = getCachedDistance(a);
+        const drivingDistanceB = getCachedDistance(b);
+        
+        // Get Haversine distance if available
+        const haversineDistanceA = a.distance_km !== undefined ? a.distance_km * 1000 : null; // Convert to meters
+        const haversineDistanceB = b.distance_km !== undefined ? b.distance_km * 1000 : null; // Convert to meters
+        
+        // Determine which distance to use for each pharmacy
+        const distanceA = drivingDistanceA ? drivingDistanceA.meters : haversineDistanceA;
+        const distanceB = drivingDistanceB ? drivingDistanceB.meters : haversineDistanceB;
+        
+        // If both have distances, sort by distance
+        if (distanceA !== null && distanceB !== null) {
+          return distanceA - distanceB;
+        }
+        
+        // If only one has distance, prioritize it
+        if (distanceA !== null && distanceB === null) return -1;
+        if (distanceA === null && distanceB !== null) return 1;
+        
+        // If neither has distance yet, maintain original order
+        return 0;
+      });
+    } else if (insuranceFilter.trim() && filtered.length > 0) {
+      // When searching by insurance but no location, randomize the order
+      // This gives users a variety of options while encouraging them to enable location
+      filtered = randomizeArray(filtered);
+    }
+
+    // Ensure we show at least 3 results if available
+    if (filtered.length > 3) {
+      filtered = filtered.slice(0, 10); // Show up to 10 results
+    }
 
     setFilteredPharmacies(filtered);
-  }, [searchQuery, pharmacies, insuranceFilter]);
+  }, [searchQuery, pharmacies, insuranceFilter, userLocation, getCachedDistance]);
 
   const handlePharmacySelect = (pharmacy) => {
     console.log("Pharmacy selected from card:", pharmacy); // Debug log
@@ -417,6 +535,63 @@ const SearchResults = () => {
           </div>
         )}
 
+        {/* Location Permission Banner */}
+        {insuranceFilter && !userLocation && !isGettingLocation && (
+          <div className="mt-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+            <div className="flex items-start">
+              <span className="material-icons text-blue-600 mr-3 mt-0.5">location_on</span>
+              <div className="flex-1">
+                <h3 className="text-blue-800 font-medium mb-1">Enable Location for Better Results</h3>
+                <p className="text-blue-700 text-sm mb-3">
+                  Turn on your location to see the nearest pharmacies sorted by distance from you. 
+                  We'll show you at least 3 pharmacies that accept your insurance, starting with the closest ones.
+                </p>
+                <button
+                  onClick={getUserLocation}
+                  className="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-blue-700 transition-colors"
+                >
+                  Enable Location
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Location Loading Banner */}
+        {isGettingLocation && (
+          <div className="mt-4 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+            <div className="flex items-center">
+              <span className="material-icons text-yellow-600 mr-3 animate-spin">my_location</span>
+              <div>
+                <h3 className="text-yellow-800 font-medium">Getting Your Location</h3>
+                <p className="text-yellow-700 text-sm">Please allow location access to sort pharmacies by distance...</p>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Location Error Banner */}
+        {locationError && (
+          <div className="mt-4 p-4 bg-orange-50 border border-orange-200 rounded-lg">
+            <div className="flex items-start">
+              <span className="material-icons text-orange-600 mr-3 mt-0.5">location_off</span>
+              <div className="flex-1">
+                <h3 className="text-orange-800 font-medium mb-1">Location Access Denied</h3>
+                <p className="text-orange-700 text-sm mb-3">
+                  We couldn't access your location. Results are shown in random order. 
+                  You can still find pharmacies that accept your insurance.
+                </p>
+                <button
+                  onClick={getUserLocation}
+                  className="bg-orange-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-orange-700 transition-colors"
+                >
+                  Try Again
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Error Message */}
         {error && (
           <div className="mt-4 p-3 bg-red-50 border border-red-200 rounded-lg">
@@ -432,7 +607,17 @@ const SearchResults = () => {
         {/* Left side - results */}
         <div className="lg:col-span-1 space-y-6">
           <div className="flex items-center justify-between">
-            <h2 className="text-2xl font-bold text-gray-800">Pharmacies</h2>
+            <div>
+              <h2 className="text-2xl font-bold text-gray-800">Pharmacies</h2>
+              {insuranceFilter && (
+                <p className="text-sm text-gray-600 mt-1">
+                  {userLocation 
+                    ? "Showing nearest pharmacies (sorted by distance)" 
+                    : "Showing pharmacies that accept your insurance - enable location for distance sorting"
+                  }
+                </p>
+              )}
+            </div>
             <span className="text-sm text-gray-500">
               {filteredPharmacies.length} found
             </span>
@@ -487,12 +672,14 @@ const SearchResults = () => {
                     onClick={toggleDirections}
                     disabled={isGettingLocation}
                     className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors ${
-                      showDirections
+                      hasDirections
                         ? 'bg-purple-600 text-white hover:bg-purple-700'
+                        : showDirections && userLocation
+                        ? 'bg-blue-600 text-white hover:bg-blue-700'
                         : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
                     } ${isGettingLocation ? 'opacity-50 cursor-not-allowed' : ''}`}
                   >
-                    {isGettingLocation ? 'Getting Location...' : !userLocation ? 'Enable Directions' : showDirections ? 'Hide Directions' : 'Show Directions'}
+                    {isGettingLocation ? 'Getting Location...' : !userLocation ? 'Enable Directions' : hasDirections ? 'Hide Directions' : 'Show Directions'}
                   </button>
                   {userLocation && (
                     <button
@@ -511,6 +698,18 @@ const SearchResults = () => {
                   {locationError}
                 </div>
               )}
+              {showDirections && userLocation && !hasDirections && (
+                <div className="mt-2 p-2 bg-blue-50 border border-blue-200 rounded text-sm text-blue-600">
+                  <span className="material-icons text-sm mr-1">info</span>
+                  Click on a pharmacy to see directions
+                </div>
+              )}
+              {showDirections && userLocation && (
+                <div className="mt-2 p-2 bg-green-50 border border-green-200 rounded text-sm text-green-600">
+                  <span className="material-icons text-sm mr-1 animate-pulse">my_location</span>
+                  Location tracking active - your position updates in real-time
+                </div>
+              )}
             </div>
             <PatientMap 
               pharmacies={filteredPharmacies}
@@ -524,6 +723,7 @@ const SearchResults = () => {
                   setSelectedPharmacyFromCard({ ...selectedPharmacyFromCard });
                 }
               }}
+              onDirectionsStateChange={setHasDirections}
             />
           </div>
         </div>

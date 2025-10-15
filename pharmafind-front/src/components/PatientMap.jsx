@@ -40,7 +40,7 @@ class MapsErrorBoundary extends React.Component {
   }
 }
 
-const PatientMap = ({ pharmacies = [], selectedInsurance = '', onPharmacySelect, selectedPharmacyFromCard = null, showDirections = false, userLocation = null, onUserLocationChange }) => {
+const PatientMap = ({ pharmacies = [], selectedInsurance = '', onPharmacySelect, selectedPharmacyFromCard = null, showDirections = false, userLocation = null, onUserLocationChange, onDirectionsStateChange }) => {
   const [selectedPharmacy, setSelectedPharmacy] = useState(null);
   const [map, setMap] = useState(null);
   const [error, setError] = useState(null);
@@ -164,6 +164,14 @@ const PatientMap = ({ pharmacies = [], selectedInsurance = '', onPharmacySelect,
       setDirections(null);
     }
   }, [showDirections, userLocation, selectedPharmacy, map, calculateDirections]);
+
+  // Notify parent component about directions state
+  useEffect(() => {
+    if (onDirectionsStateChange) {
+      const hasDirections = !!(showDirections && userLocation && selectedPharmacy && directions);
+      onDirectionsStateChange(hasDirections);
+    }
+  }, [showDirections, userLocation, selectedPharmacy, directions, onDirectionsStateChange]);
 
   // Handle marker click
   const handleMarkerClick = (pharmacy) => {
@@ -621,7 +629,7 @@ const PatientMap = ({ pharmacies = [], selectedInsurance = '', onPharmacySelect,
           <div className="absolute top-4 left-1/2 transform -translate-x-1/2 z-10 bg-blue-600 text-white px-4 py-2 rounded-lg text-sm shadow-lg">
             <div className="flex items-center space-x-2">
               <span className="material-icons text-sm">touch_app</span>
-              <span>Click on a pharmacy marker or card to select it</span>
+              <span>{showDirections ? 'Click on a pharmacy to see directions' : 'Click on a pharmacy marker or card to select it'}</span>
             </div>
           </div>
         )}

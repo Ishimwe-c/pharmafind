@@ -67,19 +67,25 @@ export default function MedicineManagement() {
   };
 
   const fetchMedicines = async () => {
+    // Don't fetch medicines if pharmacy is not loaded
+    if (!pharmacy?.id) {
+      console.log('Skipping medicine fetch - pharmacy not loaded yet');
+      return;
+    }
+
     try {
       setLoading(true);
       setError(null);
       
       const params = new URLSearchParams();
-      if (pharmacy?.id) params.append('pharmacy_id', pharmacy.id);
+      params.append('pharmacy_id', pharmacy.id); // Always include pharmacy_id
       if (searchTerm) params.append('search', searchTerm);
       if (categoryFilter) params.append('category', categoryFilter);
       if (stockFilter === 'in_stock') params.append('in_stock', 'true');
       if (stockFilter === 'out_of_stock') params.append('in_stock', 'false');
 
       console.log('Fetching medicines with params:', params.toString());
-      console.log('Pharmacy ID:', pharmacy?.id);
+      console.log('Pharmacy ID:', pharmacy.id);
       
       const response = await axiosClient.get(`/medicines?${params.toString()}`);
       console.log('Medicines API response:', response.data);
@@ -113,14 +119,16 @@ export default function MedicineManagement() {
     }
   };
 
-  // Refetch when filters change
+  // Refetch when filters change (only if pharmacy is loaded)
   useEffect(() => {
-    const timeoutId = setTimeout(() => {
-      fetchMedicines();
-    }, 300);
+    if (pharmacy?.id) {
+      const timeoutId = setTimeout(() => {
+        fetchMedicines();
+      }, 300);
 
-    return () => clearTimeout(timeoutId);
-  }, [searchTerm, categoryFilter, stockFilter]);
+      return () => clearTimeout(timeoutId);
+    }
+  }, [searchTerm, categoryFilter, stockFilter, pharmacy?.id]);
 
   const handleAddMedicine = async (formData) => {
     try {
