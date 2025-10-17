@@ -10,6 +10,7 @@ use Illuminate\Notifications\Notification;
 use App\Models\Purchase;
 use App\Models\Pharmacy;
 use App\Models\User;
+use App\Mail\PurchaseConfirmationMail;
 
 class PurchaseNotification extends Notification
 {
@@ -39,7 +40,7 @@ class PurchaseNotification extends Notification
      */
     public function via(object $notifiable): array
     {
-        return ['database']; // Only use database for now
+        return ['database', 'mail']; // Send both database and email notifications
     }
 
     /**
@@ -53,17 +54,32 @@ class PurchaseNotification extends Notification
         $actionText = $this->getActionText();
         $actionUrl = $this->getActionUrl();
 
-        return (new MailMessage)
+        $mailMessage = (new MailMessage)
             ->subject($subject)
             ->greeting($greeting)
             ->line($message)
             ->line("Purchase Number: {$this->purchase->purchase_number}")
+            ->line("Pharmacy: {$this->pharmacy->pharmacy_name}")
             ->line("Total Amount: RWF " . number_format($this->purchase->total_amount, 0))
-            ->line("Payment Status: " . ucfirst(str_replace('_', ' ', $this->purchase->payment_status)))
-            ->when($actionText && $actionUrl, function ($mail) use ($actionText, $actionUrl) {
-                return $mail->action($actionText, $actionUrl);
-            })
-            ->line('Thank you for using PharmaFind!');
+            ->line("Patient Payment: RWF " . number_format($this->purchase->patient_payment, 0));
+
+        if ($this->purchase->insurance_coverage > 0) {
+            $mailMessage->line("Insurance Coverage: RWF " . number_format($this->purchase->insurance_coverage, 0));
+            if ($this->purchase->insurance) {
+                $mailMessage->line("Insurance Provider: {$this->purchase->insurance->name}");
+            }
+        }
+
+        $mailMessage->line("Payment Status: " . ucfirst(str_replace('_', ' ', $this->purchase->payment_status)))
+            ->line("Payment Method: " . ucfirst(str_replace('_', ' ', $this->purchase->payment_method)));
+
+        if ($actionText && $actionUrl) {
+            $mailMessage->action($actionText, $actionUrl);
+        }
+
+        $mailMessage->line('Thank you for using PharmaFind!');
+
+        return $mailMessage;
     }
 
     /**

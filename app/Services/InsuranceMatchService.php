@@ -6,7 +6,9 @@ use App\Models\User;
 use App\Models\Pharmacy;
 use App\Models\Insurance;
 use App\Notifications\InsuranceMatchAlert;
+use App\Mail\InsuranceMatchMail;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Mail;
 
 class InsuranceMatchService
 {
@@ -38,8 +40,29 @@ class InsuranceMatchService
                     ->get();
 
                 foreach ($matchingInsurances as $insurance) {
-                    // Send notification to user
+                    // Send in-app notification to user
                     $user->notify(new InsuranceMatchAlert($pharmacy, $insurance, $distance));
+                    
+                    // Send email notification
+                    try {
+                        Mail::to($user->email)->send(new InsuranceMatchMail($pharmacy, $insurance, $distance, $user));
+                        
+                        Log::info("Insurance match email sent", [
+                            'user_id' => $user->id,
+                            'user_email' => $user->email,
+                            'pharmacy_id' => $pharmacy->id,
+                            'insurance_id' => $insurance->id,
+                            'distance' => $distance
+                        ]);
+                    } catch (\Exception $e) {
+                        Log::error("Failed to send insurance match email", [
+                            'user_id' => $user->id,
+                            'user_email' => $user->email,
+                            'pharmacy_id' => $pharmacy->id,
+                            'insurance_id' => $insurance->id,
+                            'error' => $e->getMessage()
+                        ]);
+                    }
                     
                     Log::info("Insurance match notification sent", [
                         'user_id' => $user->id,
@@ -125,7 +148,28 @@ class InsuranceMatchService
             ->get();
 
         foreach ($matchingInsurances as $insurance) {
+            // Send in-app notification
             $user->notify(new InsuranceMatchAlert($pharmacy, $insurance));
+            
+            // Send email notification
+            try {
+                Mail::to($user->email)->send(new InsuranceMatchMail($pharmacy, $insurance, null, $user));
+                
+                Log::info("Insurance match email sent (pharmacy check)", [
+                    'user_id' => $user->id,
+                    'user_email' => $user->email,
+                    'pharmacy_id' => $pharmacy->id,
+                    'insurance_id' => $insurance->id
+                ]);
+            } catch (\Exception $e) {
+                Log::error("Failed to send insurance match email (pharmacy check)", [
+                    'user_id' => $user->id,
+                    'user_email' => $user->email,
+                    'pharmacy_id' => $pharmacy->id,
+                    'insurance_id' => $insurance->id,
+                    'error' => $e->getMessage()
+                ]);
+            }
         }
 
         return $matchingInsurances;

@@ -29,21 +29,28 @@ const ForgotPassword = () => {
     }
 
     try {
-      // TODO: Replace with actual API call
-      // const response = await fetch('/api/auth/forgot-password', {
-      //   method: 'POST',
-      //   headers: { 'Content-Type': 'application/json' },
-      //   body: JSON.stringify({ email })
-      // });
-      
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
-      setSuccess(true);
-      // Navigate to success page or show success message
-      navigate("/auth/reset-link-sent");
+      const response = await fetch('/api/forgot-password', {
+        method: 'POST',
+        headers: { 
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
+        },
+        body: JSON.stringify({ email })
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        setSuccess(true);
+      } else {
+        if (response.status === 422) {
+          setError("No account found with this email address.");
+        } else {
+          setError(data.message || "Failed to send reset link. Please try again.");
+        }
+      }
     } catch (err) {
-      setError("Failed to send reset link. Please try again.");
+      setError("Network error. Please check your connection and try again.");
     } finally {
       setLoading(false);
     }
@@ -51,75 +58,95 @@ const ForgotPassword = () => {
 
   if (success) {
     return (
-      <div className="text-center">
-        <span className="material-icons text-teal-500 text-5xl mb-4">
-          check_circle
-        </span>
-        <h2 className="text-2xl font-bold text-gray-900 mb-2">
-          Reset Link Sent!
-        </h2>
-        <p className="text-gray-600 mb-6">
-          We've sent a password reset link to {email}
-        </p>
-        <Link
-          to="/auth/login"
-          className="text-teal-500 hover:text-teal-600 font-medium"
-        >
-          Back to Login
-        </Link>
+      <div className="min-h-screen flex items-center justify-center bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
+        <div className="max-w-md w-full space-y-8 text-center">
+          <div className="mb-6">
+            <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
+              <svg className="w-8 h-8 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+              </svg>
+            </div>
+            <h2 className="text-2xl font-bold text-gray-900 mb-2">Check Your Email</h2>
+            <p className="text-gray-600">
+              We've sent a password reset link to <strong>{email}</strong>
+            </p>
+          </div>
+          
+          <div className="space-y-4">
+            <p className="text-sm text-gray-500">
+              Didn't receive the email? Check your spam folder or try again.
+            </p>
+            
+            <div className="flex flex-col sm:flex-row gap-3">
+              <Button
+                onClick={() => {
+                  setSuccess(false);
+                  setEmail("");
+                }}
+                variant="outline"
+                className="flex-1"
+              >
+                Try Different Email
+              </Button>
+              <Button
+                onClick={() => navigate("/auth/login")}
+                className="flex-1"
+              >
+                Back to Login
+              </Button>
+            </div>
+          </div>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="w-full max-w-md mx-auto">
-      <div className="text-center mb-8">
-        <span className="material-icons text-teal-500 text-5xl mb-4">
-          lock_reset
-        </span>
-        <h2 className="text-3xl font-bold text-gray-900 mb-2">
-          Forgot Password?
-        </h2>
-        <p className="text-gray-600">
-          Enter the email address associated with your account and we will
-          send an email with instructions to reset your password.
-        </p>
-      </div>
-
-      {/* Show error if request fails */}
-      {error && (
-        <div className="bg-red-100 text-red-700 px-4 py-3 rounded-lg mb-6">
-          {error}
+    <div className="min-h-screen flex items-center justify-center bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
+      <div className="max-w-md w-full space-y-8">
+        <div>
+          <h2 className="mt-6 text-center text-3xl font-extrabold text-gray-900">
+            Forgot Password?
+          </h2>
+          <p className="mt-2 text-center text-sm text-gray-600">
+            Enter your email address and we'll send you a link to reset your password.
+          </p>
         </div>
-      )}
+        
+        <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
+          <div>
+            <Input
+              id="email"
+              name="email"
+              type="email"
+              autoComplete="email"
+              required
+              placeholder="Enter your email address"
+              value={email}
+              onChange={handleChange}
+              error={error}
+            />
+          </div>
 
-      {/* Form */}
-      <form onSubmit={handleSubmit} className="space-y-6">
-        <Input
-          label="Email Address"
-          type="email"
-          name="email"
-          value={email}
-          onChange={handleChange}
-          placeholder="Enter your email address"
-          required
-          autoComplete="email"
-        />
+          <div>
+            <Button
+              type="submit"
+              disabled={loading}
+              className="w-full"
+            >
+              {loading ? "Sending..." : "Send Reset Link"}
+            </Button>
+          </div>
 
-        <Button type="submit" fullWidth disabled={loading}>
-          {loading ? "Sending..." : "Send Reset Link"}
-        </Button>
-      </form>
-
-      {/* Back to login */}
-      <div className="text-center mt-6">
-        <Link
-          to="/auth/login"
-          className="text-sm text-teal-500 hover:text-teal-600 flex items-center justify-center"
-        >
-          <span className="material-icons mr-1 text-sm">arrow_back</span>
-          Back to Login
-        </Link>
+          <div className="text-center">
+            <Link
+              to="/auth/login"
+              className="text-sm text-blue-600 hover:text-blue-500"
+            >
+              Back to Login
+            </Link>
+          </div>
+        </form>
       </div>
     </div>
   );

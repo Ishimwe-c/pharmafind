@@ -10,6 +10,8 @@ use App\Models\Pharmacy;
 use App\Models\User;
 use App\Models\Insurance;
 use App\Notifications\PurchaseNotification;
+use App\Mail\PurchaseConfirmationMail;
+use Illuminate\Support\Facades\Mail;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
@@ -318,6 +320,23 @@ class PurchaseController extends Controller
                     'user_phone' => $patient->phone_number
                 ]);
                 $patient->notify(new PurchaseNotification($purchase, 'purchase_created'));
+                
+                // Also send direct email as backup
+                try {
+                    Mail::to($patient->email)->send(new PurchaseConfirmationMail($purchase, $patient, 'purchase_created'));
+                    \Log::info('📧 Purchase confirmation email sent directly', [
+                        'user_id' => $patient->id,
+                        'user_email' => $patient->email,
+                        'purchase_id' => $purchase->id
+                    ]);
+                } catch (\Exception $e) {
+                    \Log::error('❌ Failed to send direct purchase confirmation email', [
+                        'user_id' => $patient->id,
+                        'user_email' => $patient->email,
+                        'purchase_id' => $purchase->id,
+                        'error' => $e->getMessage()
+                    ]);
+                }
             } else {
                 \Log::warning('⚠️ No linked user found for purchase');
             }
@@ -356,6 +375,23 @@ class PurchaseController extends Controller
                         'user_name' => $phoneUser->name
                     ]);
                     $phoneUser->notify(new PurchaseNotification($purchase, 'purchase_created'));
+                    
+                    // Also send direct email as backup
+                    try {
+                        Mail::to($phoneUser->email)->send(new PurchaseConfirmationMail($purchase, $phoneUser, 'purchase_created'));
+                        \Log::info('📧 Purchase confirmation email sent to phone-matched user', [
+                            'user_id' => $phoneUser->id,
+                            'user_email' => $phoneUser->email,
+                            'purchase_id' => $purchase->id
+                        ]);
+                    } catch (\Exception $e) {
+                        \Log::error('❌ Failed to send direct purchase confirmation email to phone-matched user', [
+                            'user_id' => $phoneUser->id,
+                            'user_email' => $phoneUser->email,
+                            'purchase_id' => $purchase->id,
+                            'error' => $e->getMessage()
+                        ]);
+                    }
                 }
             } else {
                 \Log::warning('⚠️ No patient phone provided in request');

@@ -286,7 +286,7 @@ class GeolocationService {
         latitude: position.latitude,
         longitude: position.longitude,
         radius_km: this.notificationRadius,
-        notify: false // Don't send database notifications, only browser notifications
+        notify: true // Send both database notifications and email notifications
       });
 
       console.log('✅ API Response:', {

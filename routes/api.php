@@ -21,6 +21,8 @@ Route::get('/insurances', [InsuranceController::class, 'index']);
 Route::post('/register/patient', [AuthController::class, 'registerPatient']);
 Route::post('/register/pharmacy', [AuthController::class, 'registerPharmacy']);
 Route::post('/login', [AuthController::class, 'login']);
+Route::post('/forgot-password', [AuthController::class, 'forgotPassword']);
+Route::post('/reset-password', [AuthController::class, 'resetPassword']);
 Route::get('/pharmacies', [PharmacyController::class, 'index']);
 Route::get('/pharmacies/nearby', [PharmacyController::class, 'nearby']);
 Route::post('/contact', [ContactController::class, 'store']); // Public contact form
